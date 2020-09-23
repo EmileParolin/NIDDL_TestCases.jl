@@ -1,0 +1,6 @@
+Manifest.toml
+
+src/gmsh.jl
+src/libgmsh.dylib
+
+data/
