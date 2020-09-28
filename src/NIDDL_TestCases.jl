@@ -43,6 +43,7 @@ include("test_case.jl")
 include("DtN.jl")
 include("vtk_output.jl")
 include("residual.jl")
+include("input.jl")
 
 export
     Geometry,
@@ -62,6 +63,9 @@ export
 
     # helmholtz.jl
     HelmholtzPb,
+
+    # input.jl
+    InputData,
 
     # maxwell.jl
     MaxwellPb,

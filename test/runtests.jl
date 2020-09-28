@@ -6,26 +6,25 @@ include("../src/gmsh.jl")
 
 function andiamo(;geos=Geometry[], Nλs=[20,], tcs=TestCase[],
                  tps=TransmissionParameters[], solvers=Solver[],
-                 exchange_types=[:basic,], modes=[:implicit])
-    @assert length(exchange_types) == length(tps)
+                 dds=DDM_Type[])
     # Runs
     Nits_test = Int64[]
-    for (ig, g) in enumerate(geos)
-        for (ih, Nλ) in enumerate(Nλs)
+    for g in geos
+        for Nλ in Nλs
             # Mesh and domains
             h = 2π/abs(maximum([tc.medium.k0 for tc in tcs])) / max(10, Nλ)
             m, Ωs, Γs = get_mesh_and_domains(g, h)
-            for (ic, tc) in enumerate(tcs)
-                for (it, (tp,exchange_type)) in enumerate(zip(tps,exchange_types))
-                    for (iM, mode) in enumerate(modes)
+            for tc in tcs
+                for tp in tps
+                    for dd in dds
                         # Problems
-                        fullpb, pbs = get_problems(g, tc, Ωs, Γs, tp; exchange_type=exchange_type)
+                        fullpb, pbs = get_problems(g, tc, Ωs, Γs, tp, dd)
                         # Exact discrete solution
                         uexact = solve(m,fullpb)
                         # DDM
-                        ddm = femDDM(m, fullpb, pbs; mode=mode,
-                                     exchange_type=exchange_type)
-                        for (is, solver) in enumerate(solvers)
+                        gid = InputData(m, fullpb, pbs)
+                        ddm = DDM(pbs, gid, dd);
+                        for solver in solvers
                             solver.x .*= 0
                             resfunc = get_resfunc(m, fullpb, pbs, ddm, uexact, solver);
                             u,x,res = solver(ddm; resfunc=resfunc);
@@ -65,7 +64,6 @@ Nits = Dict((2, AcousticMedium, :basic)
                8, 11],
            )
 
-
 @testset "All tests" begin
     @testset "Non-regression" begin
         k = 1
@@ -82,24 +80,27 @@ Nits = Dict((2, AcousticMedium, :basic)
                         LayersGeo(;d=d, shape=[:circle, :sphere][d-1], as=[     1,],
                                 interior=true, nΩ=2, mode=:metis, nl=0), ]
                 tcs = [ScatteringTC(;d=d, medium=medium, θ0=π/2, ϕ0=0, bcs=[RobinBC,]),]
-                modes=[:explicit, :implicit,];
                 solvers = [Jacobi_S(;tol=1e-1, maxit=1000, r=0.5, light_mode=true),
                            GMRES_S(;tol=1e-3, maxit=1000, light_mode=true), ]
                 @testset "Exchange type : standard" begin
                     tps = [DespresTP(;z=1), SndOrderTP(;z=1,α=1/(2*k^2)),
                            DtN_neighbours_TP(;z=1,medium=dissipative_medium(medium),fbc=:robin),]
+                    dds = [OnionDDM(;implicit=false),
+                           OnionDDM(;implicit=true),]
                     Nits_test = andiamo(geos=geos, Nλs=Nλs, tcs=tcs, tps=tps,
-                                        solvers=solvers, exchange_types=[:basic for _ in tps],
-                                        modes=modes);
+                                        solvers=solvers,
+                                        dds=dds);
                     @show Nits_test
                     @test Nits[(d, typeof(medium), :basic)] == Nits_test
                 end
                 @testset "Exchange type : projection" begin
                     tps = [DespresTP(;z=1), SndOrderTP(;z=1,α=1/(2*k^2)),
                            DtN_TP(;z=1,medium=dissipative_medium(medium),fbc=:robin),]
+                    dds = [JunctionsDDM(;implicit=false, precond=true),
+                           JunctionsDDM(;implicit=true,  precond=true),]
                     Nits_test = andiamo(geos=geos, Nλs=Nλs, tcs=tcs, tps=tps,
-                                        solvers=solvers, exchange_types=[:xpts for _ in tps],
-                                        modes=modes);
+                                        solvers=solvers,
+                                        dds=dds);
                     @show Nits_test
                     @test Nits[(d, typeof(medium), :xpts)] == Nits_test
                 end

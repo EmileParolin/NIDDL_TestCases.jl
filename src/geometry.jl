@@ -101,11 +101,8 @@ end
 
 
 function get_problems(g::LayersGeo, tc::TestCase, Ωs::Vector{Domain},
-                      Γs::Vector{Domain}, tp::TransmissionParameters;
-                      exchange_type=:xpts)
-    @assert exchange_type in [:basic, :xpts]
-    # Layering sanity check
-    if exchange_type == :xpts @assert g.nl == 0 || g.layer_from_PBC end
+                      Γs::Vector{Domain}, tp::TransmissionParameters,
+                      dd::OnionDDM)
     # Full domain
     Ω = union(Ωs...)
     Γ = union(Γs...)
@@ -122,17 +119,40 @@ function get_problems(g::LayersGeo, tc::TestCase, Ωs::Vector{Domain},
         pbc = tc([intersect(γ, Γi) for Γi in Γs])
         filter!(bc -> !isempty(bc.Γ), pbc)
         # Transmission boundary conditions
-        if exchange_type == :xpts
-            Σs = [γ,]
-        else
-            # Domain-to-domain contributions
-            γΣ = setdiff(γ, intersect(γ, Γ)) # γ \ (γ ∩ Γ)
-            Σs = [intersect(γΣ, boundary(oω)) for oω in Ωs if oω != ω]
-            filter!(σ -> !isempty(σ), Σs)
-        end
+        γΣ = setdiff(γ, intersect(γ, Γ)) # γ \ (γ ∩ Γ)
+        Σs = [intersect(γΣ, boundary(oω)) for oω in Ωs if oω != ω]
+        filter!(σ -> !isempty(σ), Σs)
         tbcs = [tp(Σ; geo=g, Ωs=Ωs, Γs=Γs, tc=tc) for Σ in Σs]
         # Local problem
         pb = tc.pb_type(tc.medium,ω,vcat(pbc, tbcs))
+        push!(pbs, pb)
+    end
+    return fullpb, pbs
+end
+function get_problems(g::LayersGeo, tc::TestCase, Ωs::Vector{Domain},
+                      Γs::Vector{Domain}, tp::TransmissionParameters,
+                      dd::JunctionsDDM)
+    # Layering sanity check
+    @assert g.nl == 0 || g.layer_from_PBC
+    # Full domain
+    Ω = union(Ωs...)
+    Γ = union(Γs...)
+    @assert sort(tags(Γ)) == sort(tags(boundary(Ω)))
+    # Source (boundary conditions)
+    bcs = tc(Γs)
+    # Full problem
+    fullpb = tc.pb_type(tc.medium,Ω,bcs)
+    # Local problems
+    pbs = Array{tc.pb_type,1}(undef,0)
+    for ω in Ωs
+        γ = boundary(ω)
+        # Physical boundary condition
+        pbc = tc([intersect(γ, Γi) for Γi in Γs])
+        filter!(bc -> !isempty(bc.Γ), pbc)
+        # Transmission boundary conditions
+        tbc = tp(γ; geo=g, Ωs=Ωs, Γs=Γs, tc=tc)
+        # Local problem
+        pb = tc.pb_type(tc.medium,ω,vcat(pbc, tbc))
         push!(pbs, pb)
     end
     return fullpb, pbs

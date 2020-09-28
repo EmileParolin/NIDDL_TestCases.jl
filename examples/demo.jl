@@ -22,6 +22,8 @@ d = 2
 k = 5
 Nλ = 30
 λ(k) = 2π/k
+# Timer
+to = TimerOutput()
 # Geometry
 g = LayersGeo(;d=d, shape=[:circle,:sphere,][d-1], as=[1,2],
               interior=false, nΩ=16, mode=:metis, nl=3, layer_from_PBC=true)
@@ -54,11 +56,11 @@ tp = DtN_TP(;z=1,medium=dissipative_medium(medium),fbc=:robin)
 # Solver
 solver = Jacobi_S(;tol=1.e-12, maxit=10000, r=0.5, light_mode=false)
 solver = GMRES_S(;tol=1.e-12, maxit=10000, light_mode=false)
-# Timer
-to = TimerOutput()
+# DDM type
+dd = OnionDDM(;implicit=true)
+dd = JunctionsDDM(;implicit=true, precond=true)
 # Problems
-exchange_type = :xpts
-fullpb, pbs = get_problems(g, tc, Ωs, Γs, tp; exchange_type=exchange_type);
+fullpb, pbs = get_problems(g, tc, Ωs, Γs, tp, dd);
 # Exact discrete solution
 if solver.light_mode
     uexact = zeros(Complex{Float64},0)
@@ -68,9 +70,10 @@ else
     MKtoΩ = sparse(I, number_of_elements(m,fullpb.Ω,dofdim(fullpb)), length(uexact));
     uexact = MKtoΩ * uexact;
 end
-# DDM
-ddm = femDDM(m, fullpb, pbs; mode=:implicit, exchange_type=exchange_type, to=to);
 
+# DDM
+gid = InputData(m, fullpb, pbs; to=to);
+ddm = DDM(pbs, gid, dd; to=to);
 @timeit to "Resfunc setup" resfunc = get_resfunc(m, fullpb, pbs, ddm, uexact, solver);
 @timeit to "Solver" u,x,res = solver(ddm; resfunc=resfunc, to=to);
 # Printing some timings
