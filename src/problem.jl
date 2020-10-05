@@ -68,97 +68,76 @@ function apply_bc(m::Mesh,pb::Problem,A)
     return A
 end
 
-function get_matrix(m::Mesh,pb::Problem,RΩ; to=missing)
-    if ismissing(to) to = TimerOutputs.get_defaulttimer() end
-    @timeit to "Matrix assembly" begin
-        u_u, Du_Du = get_matrix_building_blocks(m,pb.Ω,pb;
-                                                coefM=bcoef(pb.medium),
-                                                coefK=acoef(pb.medium))
-        A = RΩ * (Du_Du - u_u) * transpose(RΩ)
-        A = apply_bc(m, pb, A)
-    end
-    return A
-end
 
-function get_matrix(m::Mesh,pb::Problem; to=missing)
-    if ismissing(to) to = TimerOutputs.get_defaulttimer() end
-    @timeit to "Matrix assembly" begin
-        u_u, Du_Du = get_matrix_building_blocks(m,pb.Ω,pb;
-                                                coefM=bcoef(pb.medium),
-                                                coefK=acoef(pb.medium))
-        RΩ = restriction(m,pb.Ω,dofdim(pb))
-        A = RΩ * (Du_Du - u_u) * transpose(RΩ)
-        A = apply_bc(m, pb, A)
-    end
+function get_matrix(m::Mesh,pb::Problem)
+    u_u, Du_Du = get_matrix_building_blocks(m,pb.Ω,pb;
+                                            coefM=bcoef(pb.medium),
+                                            coefK=acoef(pb.medium))
+    RΩ = restriction(m,pb.Ω,dofdim(pb))
+    A = RΩ * (Du_Du - u_u) * transpose(RΩ)
+    A = apply_bc(m, pb, A)
     return A
 end
 
 
-function get_rhs(m::Mesh,pb::Problem; to=missing)
-    if ismissing(to) to = TimerOutputs.get_defaulttimer() end
-    @timeit to "RHS assembly" begin
-        # Initialisation
-        b = zeros(Complex{Float64}, number_of_elements(m, pb.Ω, dofdim(pb)))
-        # Applying physical boundary conditions
-        for bc in filter(bc->typeof(bc) <: PhysicalBC, pb.BCs)
-            [@assert tag in tags(boundary(pb.Ω)) for tag in tags(bc.Γ)]
-            b = rhs(b,m,pb,bc)
-        end
-        # Applying transmission boundary conditions
-        for bc in filter(bc->typeof(bc) <: TransmissionBC, pb.BCs)
-            [@assert tag in tags(boundary(pb.Ω)) for tag in tags(bc.Γ)]
-            b = rhs(b,m,pb,bc)
-        end
+function get_matrix_no_transmission_BC(m::Mesh,pb::Problem)
+    pb_noTBC = typeof(pb)(pb.medium, pb.Ω, filter(bc->typeof(bc)<:PhysicalBC, pb.BCs))
+    return get_matrix(m,pb_noTBC)
+end
+
+
+function get_rhs(m::Mesh,pb::Problem)
+    # Initialisation
+    b = zeros(Complex{Float64}, number_of_elements(m, pb.Ω, dofdim(pb)))
+    # Applying physical boundary conditions
+    for bc in filter(bc->typeof(bc) <: PhysicalBC, pb.BCs)
+        [@assert tag in tags(boundary(pb.Ω)) for tag in tags(bc.Γ)]
+        b = rhs(b,m,pb,bc)
+    end
+    # Applying transmission boundary conditions
+    for bc in filter(bc->typeof(bc) <: TransmissionBC, pb.BCs)
+        [@assert tag in tags(boundary(pb.Ω)) for tag in tags(bc.Γ)]
+        b = rhs(b,m,pb,bc)
     end
     return b
 end
 
 
-function solve(m::Mesh,pb::Problem; to=missing)
-    if ismissing(to) to = TimerOutputs.get_defaulttimer() end
-    @timeit to "Solve" begin
-        K = get_matrix(m,pb;to=to)
-        f = get_rhs(m,pb;to=to)
-        @timeit to "Factorization" KLU = factorize(K)
-        @timeit to "F/B substitutions" u = KLU \ f
-    end
+function solve(m::Mesh,pb::Problem)
+    K = get_matrix(m,pb)
+    f = get_rhs(m,pb)
+    KLU = factorize(K)
+    u = KLU \ f
     return u
 end
 
 
 function solve_gmres(m::Mesh,pb::Problem; tol=1.e-3, maxit=100, restart=20,
-                     light_mode=true, uexact=0, to=missing)
-    if ismissing(to) to = TimerOutputs.get_defaulttimer() end
-    @timeit to "Solve" begin
-        K = get_matrix(m,pb;to=to)
-        f = get_rhs(m,pb;to=to)
-        u = zeros(Complex{Float64}, length(f))
-        # Volume energy norm
-        nrg_norm = u -> Inf
-        if !light_mode
-            AHD = A_HDnorm(m,pb.Ω,pb)
-            nrg_norm = u -> (AHD(u .- uexact) / AHD(uexact))
-        end
-        # GMRES iterator
-        g = IterativeSolvers.gmres_iterable!(u, K, f; tol=tol, maxiter=maxit,
-                                            restart=restart, light_mode=light_mode)
-        # Residual (or other types of error)
-        res = zeros(Float64,maxit,2).+Inf # for convergence plots
-        @timeit to "Iterations" for (it,resl2) in enumerate(g)
-            # Computation of residual/error
-            res[it,1] = resl2 # exact l2 residual
-            res[it,2] = nrg_norm(g.xbis)
-            @info "Iteration $(it) at $(res[it,:])"
-        end
+                     light_mode=true, uexact=0)
+    K = get_matrix(m,pb)
+    f = get_rhs(m,pb)
+    u = zeros(Complex{Float64}, length(f))
+    # Volume energy norm
+    nrg_norm = u -> Inf
+    if !light_mode
+        AHD = A_HDnorm(m,pb.Ω,pb)
+        nrg_norm = u -> (AHD(u .- uexact) / AHD(uexact))
     end
+    # GMRES iterator
+    g = IterativeSolvers.gmres_iterable!(u, K, f; tol=tol, maxiter=maxit,
+                                        restart=restart, light_mode=light_mode)
+    # Residual (or other types of error)
+    res = zeros(Float64,maxit,2).+Inf # for convergence plots
+    res[it,1] = resl2 # exact l2 residual
+    res[it,2] = nrg_norm(g.xbis)
+    @info "Iteration $(it) at $(res[it,:])"
     return u, res
 end
 
 
-function cond(m::Mesh,pb::Problem; to=missing)
-    if ismissing(to) to = TimerOutputs.get_defaulttimer() end
-    K = get_matrix(m,pb;to=to)
-    @timeit to "F/B substitutions" c = cond(Array(K))
+function cond(m::Mesh,pb::Problem)
+    K = get_matrix(m,pb)
+    c = cond(Array(K))
     return c
 end
 

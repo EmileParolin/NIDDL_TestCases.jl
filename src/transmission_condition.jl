@@ -20,7 +20,7 @@ function apply(A,m::Mesh,pb::Problem,bc::TransmissionBC)
     RΩ = restriction(m, pb.Ω, dofdim(pb))
     MAtoΩ = sparse(I, number_of_elements(m,pb.Ω,dofdim(pb)), size(A,1))
     P = RΓ*transpose(RΩ)*MAtoΩ
-    return A - im*pb.medium.k0 * transpose(P) * T * P
+    return A - im * transpose(P) * T * P
 end
 
 """
@@ -47,7 +47,7 @@ get_label(tp::Idl2TP) = "\${\\rm Id}\$"
 function matrix(m::Mesh,pb::Problem,bc::Idl2TBC)
     N = number_of_elements(m,bc.Γ,dofdim(pb))
     M = sparse(I,N,N)
-    return bc.tp.z * M
+    return pb.medium.k0 * bc.tp.z * M
 end
 
 ###########
@@ -70,7 +70,7 @@ function matrix(m::Mesh,pb::Problem,bc::DespresTBC)
     RΓ = restriction(m, bc.Γ, dofdim(pb))
     coef = x -> ccoef(pb.medium)(x) / pb.medium.k0
     M = RΓ * get_mass_matrix(m,bc.Γ,pb; coef=coef) * transpose(RΓ)
-    return bc.tp.z * M
+    return pb.medium.k0 * bc.tp.z * M
 end
 
 #############
@@ -105,5 +105,5 @@ get_label(tp::SndOrderTP) = "\${\\rm 2nd order}\$"
 function matrix(m::Mesh,pb::Problem,bc::SndOrderTBC)
     RΓ = restriction(m, bc.Γ, dofdim(pb))
     M, K = get_matrix_building_blocks(m,bc.Γ,pb)
-    return bc.tp.z * RΓ * (M + bc.tp.α * K) * transpose(RΓ)
+    return pb.medium.k0 * bc.tp.z * RΓ * (M + bc.tp.α * K) * transpose(RΓ)
 end

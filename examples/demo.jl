@@ -61,18 +61,19 @@ dd = OnionDDM(;implicit=true)
 dd = JunctionsDDM(;implicit=true, precond=true)
 # Problems
 fullpb, pbs = get_problems(g, tc, Ωs, Γs, tp, dd);
+
 # Exact discrete solution
 if solver.light_mode
     uexact = zeros(Complex{Float64},0)
 else
-    @timeit to "Full problem resolution" uexact = solve(m,fullpb;to=to);
+    @timeit to "Full problem resolution" uexact = solve(m,fullpb);
     # Taking care of potential auxiliary equations
-    MKtoΩ = sparse(I, number_of_elements(m,fullpb.Ω,dofdim(fullpb)), length(uexact));
+    NΩ = number_of_elements(m,fullpb.Ω,dofdim(fullpb));
+    MKtoΩ = Mapping(1:NΩ, 1:NΩ, (NΩ, length(uexact)));
     uexact = MKtoΩ * uexact;
 end
-
 # DDM
-gid = InputData(m, fullpb, pbs; to=to);
+gid = InputData(m, fullpb, pbs);
 ddm = DDM(pbs, gid, dd; to=to);
 @timeit to "Resfunc setup" resfunc = get_resfunc(m, fullpb, pbs, ddm, uexact, solver);
 @timeit to "Solver" u,x,res = solver(ddm; resfunc=resfunc, to=to);

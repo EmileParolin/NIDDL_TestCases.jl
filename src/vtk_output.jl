@@ -95,7 +95,6 @@ end
 function save_vector_partition(m::Mesh, Ωs::Vector{Domain}, ufieldss,
                                name::String)
     vtmfile = vtk_multiblock(name)
-    local vtkfile
     for (Ω, ufields) in zip(Ωs, ufieldss)
         vtkfile = vtk_grid(vtmfile, get_points_cells(m, Ω)...)
         vtkfile = set_data(vtkfile, m, Ω, ufields)
@@ -210,8 +209,8 @@ function save_solutions_partition(m, fullpb, pbs, ddm, solver, u, uexact, prefix
     if !(solver.light_mode)
         uexactis = [transpose(ld.MΩitoΩ) * uexact for ld in ddm.lds]
         save_vector_partition(m, [pb.Ω for pb in pbs],
-                            [[("u",toP1(pb,m,pb.Ω,ui))]
-                            for (pb, ui) in zip(pbs, uis)],
+                            [[("u",toP1(pb,m,pb.Ω,uexacti))]
+                            for (pb, uexacti) in zip(pbs, uexactis)],
                             prefix*"uexact_"*name)
         save_vector_partition(m, [pb.Ω for pb in pbs],
                             [[("e",toP1(pb,m,pb.Ω,uexacti.-ui))]

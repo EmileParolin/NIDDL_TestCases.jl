@@ -18,8 +18,7 @@ length) of geometrical entities characterized by the key in elt2vtx;
 in the mesh.
 """
 function construct_mesh(; d=2, shape=:circle, as=[1,], interior=true, h=0.1,
-                        nΩ=1, mode=:metis, name="", gmsh_info=10, to=missing)
-    if ismissing(to) to = TimerOutputs.get_defaulttimer() end
+                        nΩ=1, mode=:metis, name="", gmsh_info=10)
     @assert d in [2,3] "Incorrect dimension d = $(d), should be 2 or 3."
     d == 2 && @assert shape in [:circle, :square]
     d == 3 && @assert shape in [:sphere, :box, :cylinder, :cone]
@@ -42,109 +41,105 @@ function construct_mesh(; d=2, shape=:circle, as=[1,], interior=true, h=0.1,
         as_cad = interior ? [as[end],] : [as[1], as[end],]
     end
     # Start of GMSH stuff
-    @timeit to "GMSH" begin
-        gmsh.initialize()
-        gmsh.model.add("Model")
-        gmsh.option.setNumber("General.Terminal", gmsh_info)
-        gmsh.option.setNumber("Mesh.CharacteristicLengthMin", h)
-        gmsh.option.setNumber("Mesh.CharacteristicLengthMax", h)
-        # Adding temporary domains to later define actual domain by difference
-        @info "Creating geometry"
-        shell_tags = Int64[]
-        for ai in as_cad
-            if d == 2
-                if shape==:circle
-                    push!(shell_tags, gmsh.model.occ.addDisk(0, 0, 0, ai, ai))
-                elseif shape==:square
-                    push!(shell_tags, gmsh.model.occ.addRectangle(-ai/2, -ai/2, 0, ai, ai))
-                end
-            elseif d == 3
-                if shape==:sphere
-                    push!(shell_tags, gmsh.model.occ.addSphere(0, 0, 0, ai))
-                elseif shape==:box
-                    push!(shell_tags, gmsh.model.occ.addBox(-ai/2, -ai/2, -ai/2, ai, ai, ai))
-                elseif shape==:cylinder
-                    push!(shell_tags, gmsh.model.occ.addCylinder(0, 0, -ai/2, 0, 0, ai, ai))
-                elseif shape==:cone
-                    push!(shell_tags, gmsh.model.occ.addCone(0, 0, -ai/2, 0, 0, ai, ai, 0))
-                end
+    gmsh.initialize()
+    gmsh.model.add("Model")
+    gmsh.option.setNumber("General.Terminal", gmsh_info)
+    gmsh.option.setNumber("Mesh.CharacteristicLengthMin", h)
+    gmsh.option.setNumber("Mesh.CharacteristicLengthMax", h)
+    # Adding temporary domains to later define actual domain by difference
+    @info "Creating geometry"
+    shell_tags = Int64[]
+    for ai in as_cad
+        if d == 2
+            if shape==:circle
+                push!(shell_tags, gmsh.model.occ.addDisk(0, 0, 0, ai, ai))
+            elseif shape==:square
+                push!(shell_tags, gmsh.model.occ.addRectangle(-ai/2, -ai/2, 0, ai, ai))
+            end
+        elseif d == 3
+            if shape==:sphere
+                push!(shell_tags, gmsh.model.occ.addSphere(0, 0, 0, ai))
+            elseif shape==:box
+                push!(shell_tags, gmsh.model.occ.addBox(-ai/2, -ai/2, -ai/2, ai, ai, ai))
+            elseif shape==:cylinder
+                push!(shell_tags, gmsh.model.occ.addCylinder(0, 0, -ai/2, 0, 0, ai, ai))
+            elseif shape==:cone
+                push!(shell_tags, gmsh.model.occ.addCone(0, 0, -ai/2, 0, 0, ai, ai, 0))
             end
         end
-        # Construction of main domain by difference between the temporary domains
-        # The first tag define a "volume" the following are holes in this volume
-        layers = interior ? Vector{Int64}[Int64[shell_tags[1],]] : Vector{Int64}[]
-        for ias in 1:length(as_cad)-1
-            push!(layers, reverse(shell_tags[ias:ias+1]))
-        end
-        for layer in layers
-            if d == 2
-                tag = gmsh.model.occ.addPlaneSurface(layer)
-            elseif d == 3
-                tag = gmsh.model.occ.addVolume(layer)
-            end
-        end
-        # Removing the temporary domains
-        gmsh.model.occ.remove([(d,st) for st in shell_tags])
-        # Meshing
-        @info "Meshing"
-        gmsh.model.occ.synchronize()
-        gmsh.model.mesh.generate(3)
-        # Boundary elements of geometrically constructed surfaces/boundaries
-        geobnd2vtx, geobnd_tags = extract_elements(d-1)
-        # METIS partitioning
-        if mode == :metis
-            @info "Mesh partitioning"
-            gmsh.model.mesh.partition(nΩ)
-        end
-        # Extracting geometrical entities information
-        tetdoms = [Ω for Ω in gmsh.model.getEntities(3)
-                    if length(gmsh.model.mesh.getElements(Ω...)[3]) > 0]
-        tridoms = [Ω for Ω in gmsh.model.getEntities(2)
-                    if length(gmsh.model.mesh.getElements(Ω...)[3]) > 0]
-        edgdoms = [Ω for Ω in gmsh.model.getEntities(1)
-                    if length(gmsh.model.mesh.getElements(Ω...)[3]) > 0]
-        noddoms = [Ω for Ω in gmsh.model.getEntities(0)
-                    if length(gmsh.model.mesh.getElements(Ω...)[3]) > 0]
-        # Extracting elements information
-        @info "Extracting mesh data"
-        tet2vtx, tettag = extract_elements(3)
-        tri2vtx, tritag = extract_elements(2)
-        edg2vtx, edgtag = extract_elements(1)
-        nod2vtx, nodtag = extract_elements(0)
-        # Extract nodes (and re-number according to tag)
-        nodetags, coors, _ = gmsh.model.mesh.getNodes()
-        @assert unique(nodetags) == nodetags
-        vtx = reshape(coors,3,:)
-        vtx[:,nodetags] = vtx # correct re-numbering
-        # Writting mesh on disk
-        if length(name) > 0
-            @info "Mesh saved on disk as $(name).msh4"
-            gmsh.write(name*".msh4")
-        end
-        # done...
-        gmsh.finalize()
-        @info "GMSH finalized"
     end
+    # Construction of main domain by difference between the temporary domains
+    # The first tag define a "volume" the following are holes in this volume
+    layers = interior ? Vector{Int64}[Int64[shell_tags[1],]] : Vector{Int64}[]
+    for ias in 1:length(as_cad)-1
+        push!(layers, reverse(shell_tags[ias:ias+1]))
+    end
+    for layer in layers
+        if d == 2
+            tag = gmsh.model.occ.addPlaneSurface(layer)
+        elseif d == 3
+            tag = gmsh.model.occ.addVolume(layer)
+        end
+    end
+    # Removing the temporary domains
+    gmsh.model.occ.remove([(d,st) for st in shell_tags])
+    # Meshing
+    @info "Meshing"
+    gmsh.model.occ.synchronize()
+    gmsh.model.mesh.generate(3)
+    # Boundary elements of geometrically constructed surfaces/boundaries
+    geobnd2vtx, geobnd_tags = extract_elements(d-1)
+    # METIS partitioning
+    if mode == :metis
+        @info "Mesh partitioning"
+        gmsh.model.mesh.partition(nΩ)
+    end
+    # Extracting geometrical entities information
+    tetdoms = [Ω for Ω in gmsh.model.getEntities(3)
+                if length(gmsh.model.mesh.getElements(Ω...)[3]) > 0]
+    tridoms = [Ω for Ω in gmsh.model.getEntities(2)
+                if length(gmsh.model.mesh.getElements(Ω...)[3]) > 0]
+    edgdoms = [Ω for Ω in gmsh.model.getEntities(1)
+                if length(gmsh.model.mesh.getElements(Ω...)[3]) > 0]
+    noddoms = [Ω for Ω in gmsh.model.getEntities(0)
+                if length(gmsh.model.mesh.getElements(Ω...)[3]) > 0]
+    # Extracting elements information
+    @info "Extracting mesh data"
+    tet2vtx, tettag = extract_elements(3)
+    tri2vtx, tritag = extract_elements(2)
+    edg2vtx, edgtag = extract_elements(1)
+    nod2vtx, nodtag = extract_elements(0)
+    # Extract nodes (and re-number according to tag)
+    nodetags, coors, _ = gmsh.model.mesh.getNodes()
+    @assert unique(nodetags) == nodetags
+    vtx = reshape(coors,3,:)
+    vtx[:,nodetags] = vtx # correct re-numbering
+    # Writting mesh on disk
+    if length(name) > 0
+        @info "Mesh saved on disk as $(name).msh4"
+        gmsh.write(name*".msh4")
+    end
+    # done...
+    gmsh.finalize()
+    @info "GMSH finalized"
     # Renaming
     eltdoms = [noddoms, edgdoms, tridoms, tetdoms]
     elt2vtx = [nod2vtx, edg2vtx, tri2vtx, tet2vtx]
     elttags = [nodtag,  edgtag,  tritag,  tettag ]
     # Geometrical partitionning
     if mode == :geo || mode ==:pie
-        @timeit to "Geometrical partitionning" begin
-            if mode == :geo
-                new_big2vtxs = geometrical_partitioning(vtx, elt2vtx[d+1], as, interior)
-            elseif mode == :pie
-                @assert interior && length(as) == 1
-                new_big2vtxs = pie_partitioning(vtx, elt2vtx[d+1])
-            end
-            new_domains = create_new_domains(eltdoms[d+1], elt2vtx[d+1],
-                                             eltdoms[d], elt2vtx[d], elttags[d],
-                                             vtx, new_big2vtxs, d)
-            # Unpacking
-            eltdoms[d+1], elt2vtx[d+1], elttags[d+1] = new_domains[1]
-            eltdoms[d],   elt2vtx[d],   elttags[d]   = new_domains[2]
+        if mode == :geo
+            new_big2vtxs = geometrical_partitioning(vtx, elt2vtx[d+1], as, interior)
+        elseif mode == :pie
+            @assert interior && length(as) == 1
+            new_big2vtxs = pie_partitioning(vtx, elt2vtx[d+1])
         end
+        new_domains = create_new_domains(eltdoms[d+1], elt2vtx[d+1],
+                                            eltdoms[d], elt2vtx[d], elttags[d],
+                                            vtx, new_big2vtxs, d)
+        # Unpacking
+        eltdoms[d+1], elt2vtx[d+1], elttags[d+1] = new_domains[1]
+        eltdoms[d],   elt2vtx[d],   elttags[d]   = new_domains[2]
     end
     # Clean detection of junction points
     if d == 3
@@ -563,60 +558,55 @@ is constructed using a fixed number of geometrical entities of dimension d-1,
 which are tagged with increasing tags.
 """
 function construct_domains(d::Integer, m::Mesh, eltdoms, geobnd2vtx,
-                           geobnd_tags, nas; interior=true, mode=:metis, to=missing)
-    if ismissing(to) to = TimerOutputs.get_defaulttimer() end
+                           geobnd_tags, nas; interior=true, mode=:metis)
     noddoms, edgdoms, tridoms, tetdoms = eltdoms
     @info "Creating domains"
-    @timeit to "Boundary detection" begin
-        Ωs = Vector{Vector{SingleDomain}}(undef,4)
-        @timeit to "d = 0" Ωs[1] = detect_boundaries(m, noddoms, SingleDomain[], SingleDomain[])
-        @timeit to "d = 1" Ωs[2] = detect_boundaries(m, edgdoms, noddoms, Ωs[1])
-        @timeit to "d = 2" Ωs[3] = detect_boundaries(m, tridoms, edgdoms, Ωs[2])
-        @timeit to "d = 3" Ωs[4] = detect_boundaries(m, tetdoms, tridoms, Ωs[3])
-        Ω = Domain(Ωs[d+1])
-    end
+    Ωs = Vector{Vector{SingleDomain}}(undef,4)
+    Ωs[1] = detect_boundaries(m, noddoms, SingleDomain[], SingleDomain[])
+    Ωs[2] = detect_boundaries(m, edgdoms, noddoms, Ωs[1])
+    Ωs[3] = detect_boundaries(m, tridoms, edgdoms, Ωs[2])
+    Ωs[4] = detect_boundaries(m, tetdoms, tridoms, Ωs[3])
+    Ω = Domain(Ωs[d+1])
     @info "Creating physical boundary domains"
-    @timeit to "Physical boundary" begin
-        Γs = Domain[]
-        # Determination of number of geometrical entities in a boundary
-        if mode == :geo
-            nphys = interior ? 1 : 2
-            nshell_tags = Int(length(geobnd_tags)/nphys)
-        else
-            nshell_tags = Int(length(geobnd_tags)/nas)
-        end
-        shell_tags = sort([t[2][2] for t in keys(geobnd_tags)])
-        # Relying on sorting of geo tags to determine the boundaries
-        Γext = [(d-1,(d-1,t)) for t in shell_tags[end-nshell_tags+1:end]]
-        Γint = [(d-1,(d-1,t)) for t in shell_tags[1:nshell_tags]]
-        # One or two physical boundaries
-        Γs_tags = interior ? [Γext,] : [Γint, Γext]
-        for Γtags in Γs_tags # Loop on physical boundaries
-            Γ = Domain()
-            for Γtag in Γtags # Loop on entities that make up the physical boundary
-                # Loop on all entities of dim d-1
-                for γ in skeleton(Ω)
-                    # First element of γ
-                    if dim(γ) == 1
-                        bnd2vtx = m.edg2vtx
-                    elseif dim(γ) == 2
-                        bnd2vtx = m.tri2vtx
-                    end
-                    elt = bnd2vtx[:,tag2range(m,tag(γ),dim(γ))[1]]
-                    # Loop on elements of physical boundary
-                    istart, istop = geobnd_tags[Γtag]
-                    for ie in istart:(istart+istop-1)
-                        # If this element belongs to physical boundary
-                        if norm(elt - geobnd2vtx[:,ie]) < 1.e-12
-                            # Add γ as a subset of physical boundary
-                            Γ = union(Domain(γ), Γ)
-                            break
-                        end
+    Γs = Domain[]
+    # Determination of number of geometrical entities in a boundary
+    if mode == :geo
+        nphys = interior ? 1 : 2
+        nshell_tags = Int(length(geobnd_tags)/nphys)
+    else
+        nshell_tags = Int(length(geobnd_tags)/nas)
+    end
+    shell_tags = sort([t[2][2] for t in keys(geobnd_tags)])
+    # Relying on sorting of geo tags to determine the boundaries
+    Γext = [(d-1,(d-1,t)) for t in shell_tags[end-nshell_tags+1:end]]
+    Γint = [(d-1,(d-1,t)) for t in shell_tags[1:nshell_tags]]
+    # One or two physical boundaries
+    Γs_tags = interior ? [Γext,] : [Γint, Γext]
+    for Γtags in Γs_tags # Loop on physical boundaries
+        Γ = Domain()
+        for Γtag in Γtags # Loop on entities that make up the physical boundary
+            # Loop on all entities of dim d-1
+            for γ in skeleton(Ω)
+                # First element of γ
+                if dim(γ) == 1
+                    bnd2vtx = m.edg2vtx
+                elseif dim(γ) == 2
+                    bnd2vtx = m.tri2vtx
+                end
+                elt = bnd2vtx[:,tag2range(m,tag(γ),dim(γ))[1]]
+                # Loop on elements of physical boundary
+                istart, istop = geobnd_tags[Γtag]
+                for ie in istart:(istart+istop-1)
+                    # If this element belongs to physical boundary
+                    if norm(elt - geobnd2vtx[:,ie]) < 1.e-12
+                        # Add γ as a subset of physical boundary
+                        Γ = union(Domain(γ), Γ)
+                        break
                     end
                 end
             end
-            push!(Γs, Γ)
         end
+        push!(Γs, Γ)
     end
     # Sanity checks
     msg = "Incompatibility between Domains and Mesh - dimension "

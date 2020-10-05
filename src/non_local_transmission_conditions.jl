@@ -95,10 +95,6 @@ function (tp::DtN_neighbours_TP)(Γ::Domain;
                                  Ωs=Ωs,Γs=Γs,tc=tc,kwargs...)
     return DtN_neighbours_TBC(tp,Γ,Ωs,Γs,tc)
 end
-get_name(tp::DtN_neighbours_TP) = prod(["$(typeof(tp))_z$(tp.z)",
-                                        "_nu$(tp.medium.k0)",
-                                        "_$(uppercase(String(tp.fbc))[1])"])
-get_label(tp::DtN_neighbours_TP) = "\${\\rm \\Lambda_{ik}}\$"
 
 function matrix(m::Mesh,pb::Problem,bc::DtN_neighbours_TBC)
     @assert length(bc.pbs) <= 2
@@ -106,7 +102,7 @@ function matrix(m::Mesh,pb::Problem,bc::DtN_neighbours_TBC)
     if length(bc.T) == 0
         T = sum([DtN(m,dtn_pb,bc.Γ) for dtn_pb in bc.pbs]) / length(bc.pbs)
         # Storing matrix (DDM requires at least twice its evaluation)
-        bc.T = bc.tp.z*T
+        bc.T = pb.medium.k0 * bc.tp.z * T
     end
     return bc.T
 end
@@ -223,9 +219,6 @@ end
 function (tp::DtN_TP)(Γ::Domain; Γs=Γs,tc=tc,kwargs...)
     return DtN_TBC(tp,Γ,Γs,tc)
 end
-get_name(tp::DtN_TP) = prod(["$(typeof(tp))_z$(tp.z)_nu$(tp.medium.k0)",
-                             "_$(uppercase(String(tp.fbc))[1])"])
-get_label(tp::DtN_TP) = "\${\\rm \\Lambda_{ik}}(\\Omega)\$"
 
 function matrix(m::Mesh,pb::Problem,bc::DtN_TBC)
     @assert boundary(pb.Ω) == bc.Γ
@@ -237,7 +230,7 @@ function matrix(m::Mesh,pb::Problem,bc::DtN_TBC)
         # DtN
         T = DtN(m, dtn_pb, bc.Γ)
         # Storing matrix (DDM requires at least twice its evaluation)
-        bc.T = bc.tp.z*T
+        bc.T = pb.medium.k0 * bc.tp.z * T
     end
     return bc.T
 end

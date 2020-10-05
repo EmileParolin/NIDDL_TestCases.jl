@@ -28,74 +28,62 @@ problem.
 """
 function get_mesh_and_domains(g::LayersGeo, h; name="")
     @assert h > 0
-    # Run timer
-    to = TimerOutput()
     # Constructing mesh via GMSH API
-    @timeit to "Meshing" begin
-        info = construct_mesh(d=g.d, shape=g.shape, as=g.as, interior=g.interior,
-                              h=h, nΩ=g.nΩ, mode=g.mode, name=name, to=to)
-        vtx, eltdoms, elt2vtx, elttags, geobnd2vtx, geobnd_tags = info
-    end
+    info = construct_mesh(d=g.d, shape=g.shape, as=g.as, interior=g.interior,
+                            h=h, nΩ=g.nΩ, mode=g.mode, name=name)
+    vtx, eltdoms, elt2vtx, elttags, geobnd2vtx, geobnd_tags = info
     # Constructing Mesh
-    @timeit to "Mesh struct" m = Mesh(vtx, elt2vtx..., elttags)
+    m = Mesh(vtx, elt2vtx..., elttags)
     @info "Total number of vertices     $(number_of_elements(m,0))"
     @info "                edges        $(number_of_elements(m,1))"
     @info "                triangles    $(number_of_elements(m,2))"
     @info "                tetrahedrons $(number_of_elements(m,3))"
     # Constructing Domains
-    @timeit to "Domains" begin
-        Ω, Γs = construct_domains(g.d, m, eltdoms, geobnd2vtx, geobnd_tags,
-                                  length(g.as); interior=g.interior,
-                                  mode=g.mode, to=to)
-        Ωs = [Domain(ω) for ω in Ω]
-    end
+    Ω, Γs = construct_domains(g.d, m, eltdoms, geobnd2vtx, geobnd_tags,
+                                length(g.as); interior=g.interior,
+                                mode=g.mode)
+    Ωs = [Domain(ω) for ω in Ω]
     # Interior layering
     if g.nl > 0
-        @timeit to "Interior layering" begin
-            info = interior_layering(m, Ω, Γs, g.d, g.nl, g.layer_from_PBC)
-            vtx, eltdoms, elt2vtx, elttags, grps, new2old_bndtags = info
-            # Re-Constructing Mesh
-            @timeit to "Mesh struct" m = Mesh(vtx, elt2vtx..., elttags)
-            # Re-Constructing Domains
-            noddoms, edgdoms, tridoms, tetdoms = eltdoms
-            @info "Creating domains"
-            @timeit to "Boundary detection" begin
-                ωs = Vector{Vector{SingleDomain}}(undef,4)
-                @timeit to "d = 0" ωs[1] = detect_boundaries(m, noddoms, SingleDomain[], SingleDomain[])
-                @timeit to "d = 1" ωs[2] = detect_boundaries(m, edgdoms, noddoms, ωs[1])
-                @timeit to "d = 2" ωs[3] = detect_boundaries(m, tridoms, edgdoms, ωs[2])
-                @timeit to "d = 3" ωs[4] = detect_boundaries(m, tetdoms, tridoms, ωs[3])
-                Ω = Domain(ωs[g.d+1])
-            end
-            # Sanity checks
-            msg = "Incompatibility between Domains and Mesh - dimension "
-            @assert number_of_elements(m,Ω,3) == size(m.tet2vtx,2) msg*"3"
-            @assert number_of_elements(m,Ω,2) == size(m.tri2vtx,2) msg*"2"
-            @assert number_of_elements(m,Ω,1) == size(m.edg2vtx,2) msg*"1"
-            @assert number_of_elements(m,Ω,0) == size(m.nod2vtx,2) msg*"0"
-            # Grouping sub-domains
-            Ωs = Domain[]
-            ig = 1
-            for grp in grps push!(Ωs, Domain(Ω[ig:ig+grp-1])); ig += grp end
-            # Creating new boundary domains
-            newΓs = Domain[]
-            for γ in Γs
-                newγ = Vector{SingleDomain}()
-                for (tk, tv) in new2old_bndtags
-                    if (g.d-1, tv) in tags(γ)
-                        for γi in ωs[g.d]
-                            if (g.d-1, tk) == tag(γi)
-                                push!(newγ, γi)
-                            end
+        info = interior_layering(m, Ω, Γs, g.d, g.nl, g.layer_from_PBC)
+        vtx, eltdoms, elt2vtx, elttags, grps, new2old_bndtags = info
+        # Re-Constructing Mesh
+        # Re-Constructing Domains
+        noddoms, edgdoms, tridoms, tetdoms = eltdoms
+        @info "Creating domains"
+        ωs = Vector{Vector{SingleDomain}}(undef,4)
+        ωs[1] = detect_boundaries(m, noddoms, SingleDomain[], SingleDomain[])
+        ωs[2] = detect_boundaries(m, edgdoms, noddoms, ωs[1])
+        ωs[3] = detect_boundaries(m, tridoms, edgdoms, ωs[2])
+        ωs[4] = detect_boundaries(m, tetdoms, tridoms, ωs[3])
+        Ω = Domain(ωs[g.d+1])
+        # Sanity checks
+        msg = "Incompatibility between Domains and Mesh - dimension "
+        @assert number_of_elements(m,Ω,3) == size(m.tet2vtx,2) msg*"3"
+        @assert number_of_elements(m,Ω,2) == size(m.tri2vtx,2) msg*"2"
+        @assert number_of_elements(m,Ω,1) == size(m.edg2vtx,2) msg*"1"
+        @assert number_of_elements(m,Ω,0) == size(m.nod2vtx,2) msg*"0"
+        # Grouping sub-domains
+        Ωs = Domain[]
+        ig = 1
+        for grp in grps push!(Ωs, Domain(Ω[ig:ig+grp-1])); ig += grp end
+        # Creating new boundary domains
+        newΓs = Domain[]
+        for γ in Γs
+            newγ = Vector{SingleDomain}()
+            for (tk, tv) in new2old_bndtags
+                if (g.d-1, tv) in tags(γ)
+                    for γi in ωs[g.d]
+                        if (g.d-1, tk) == tag(γi)
+                            push!(newγ, γi)
                         end
                     end
                 end
-                push!(newΓs, Domain(newγ))
             end
-            Γs = newΓs
+            push!(newΓs, Domain(newγ))
         end
+        Γs = newΓs
     end
-    @show to
     return m, Ωs, Γs
 end
 

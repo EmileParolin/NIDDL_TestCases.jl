@@ -16,7 +16,12 @@ import LinearAlgebra: norm, ldiv!
 using NIDDL_FEM
 using NIDDL
 
-import NIDDL: dofdim, get_matrix, get_rhs, transmission_boundary, boundary, matrix, DtN
+import NIDDL: indices_full_domain, indices_skeleton
+import NIDDL: indices_domain, indices_transmission_boundary
+import NIDDL: size_multi_trace, dof_weights
+import NIDDL: get_matrix, get_matrix_no_transmission_BC, get_rhs
+import NIDDL: get_transmission_matrix, DtN
+import NIDDL: matrix
 
 # For this package to work, simlink the following two files in src directory
 # - gmsh.jl
@@ -27,6 +32,10 @@ abstract type Medium end
 abstract type Geometry end
 abstract type TransmissionParameters end
 abstract type TestCase end
+
+abstract type BoundaryCondition end
+abstract type PhysicalBC <: BoundaryCondition end
+abstract type TransmissionBC <: BoundaryCondition end
 
 include("meshing.jl")
 include("unitvector.jl")
@@ -43,10 +52,13 @@ include("test_case.jl")
 include("DtN.jl")
 include("vtk_output.jl")
 include("residual.jl")
-include("input.jl")
+include("ddm.jl")
 
 export
     Geometry,
+    BoundaryCondition,
+    PhysicalBC,
+    TransmissionBC,
 
     # boundary_condition.jl
     DirichletBC,
@@ -57,15 +69,27 @@ export
     rhs,
     physical_boundary,
 
+    # ddm.jl
+    InputData,
+    indices_full_domain,
+    indices_skeleton,
+    indices_domain,
+    indices_transmission_boundary,
+    size_multi_trace,
+    dof_weights,
+    get_matrix,
+    get_matrix_no_transmission_BC,
+    get_rhs,
+    get_transmission_matrix,
+    DtN,
+
     # geometry.jl
     LayersGeo,
     get_mesh_and_domains, get_problems,
 
     # helmholtz.jl
     HelmholtzPb,
-
-    # input.jl
-    InputData,
+    dofdim,
 
     # maxwell.jl
     MaxwellPb,
