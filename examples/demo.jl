@@ -15,7 +15,6 @@ using NIDDL_FEM
 using NIDDL
 using NIDDL_TestCases
 using Test
-include("src/gmsh.jl")
 prefix=pwd()*"/data/"
 
 d = 2
