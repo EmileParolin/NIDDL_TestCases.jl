@@ -4,7 +4,7 @@ using Random
 using NIDDL_FEM
 using NIDDL
 using NIDDL_TestCases
-include("../src/gmsh.jl")
+using GmshSDK
 
 function andiamo(;geos=Geometry[], Nλs=[20,], tcs=TestCase[],
                  tps=TransmissionParameters[], solvers=Solver[],

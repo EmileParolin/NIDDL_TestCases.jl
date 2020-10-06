@@ -5,6 +5,7 @@ version = "0.1.0"
 
 [deps]
 Distributed = "8ba89e20-285c-5b6f-9357-94700520ee1b"
+GmshSDK = "357176ee-4fc2-4a7a-b2e3-8358239da070"
 IterativeSolvers = "42fd0dbc-a981-5370-80f2-aaf504508153"
 Libdl = "8f399da3-3557-5675-b5ff-fb832c97cbdb"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"

@@ -9,6 +9,7 @@ using LinearMaps
 using IterativeSolvers
 using Random
 using TimerOutputs
+using GmshSDK
 
 import Base: +,-,*,/,zero
 import LinearAlgebra: norm, ldiv!
@@ -22,11 +23,6 @@ import NIDDL: size_multi_trace, dof_weights
 import NIDDL: get_matrix, get_matrix_no_transmission_BC, get_rhs
 import NIDDL: get_transmission_matrix, DtN
 import NIDDL: matrix
-
-# For this package to work, simlink the following two files in src directory
-# - gmsh.jl
-# - libgmsh.dylib (MAC OS) or ligmsh.so (LINUX)
-include("gmsh.jl")
 
 abstract type Medium end
 abstract type Geometry end
