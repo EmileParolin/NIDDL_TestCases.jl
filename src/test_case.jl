@@ -11,12 +11,8 @@ mutable struct ScatteringTC <: TestCase
     pol::Symbol                # polarisation (:θ, :ϕ)
     bcs::Vector{DataType}      # boundary conditions
 end
-function ScatteringTC(;d=3, medium=AcousticMedium(;k0=1), θ0=π/2, ϕ0=0, pol=:θ,
-                      bcs=[RobinBC,])
-    pb_type = problem_type(medium)
-    hlm = (pb_type == HelmholtzPb && d in [2,3])
-    mxl = pb_type == MaxwellPb && d in [3,]
-    @assert hlm || mxl "Problem type $(pb_type) uncompatible with dimension d = $(d)"
+function ScatteringTC(;d=3, pb_type::DataType, medium=AcousticMedium(;k0=1),
+                      θ0=π/2, ϕ0=0, pol=:θ, bcs=[RobinBC,])
     # incidence direction
     ud = UnitVector(θ0,ϕ0) # (π,0) gives -z
     dinc = er(ud)
@@ -36,27 +32,27 @@ function (tc::ScatteringTC)(Γs::Array{Domain,1})
     pbc = BoundaryCondition[]
     # Plane wave
     pw = get_planewave(tc.medium,tc.θ0,tc.ϕ0,tc.pol)
-    f_Robin = absorbing_condition(pw)
-    f_Neumann = neumann_condition(pw)
+    f_Robin = absorbing_condition(tc.pb_type, pw)
+    f_Neumann = neumann_condition(tc.pb_type, pw)
+    # Scalar or vector problem
+    scalar_bnd = tc.pb_type == HelmholtzPb || tc.pb_type == VectorHelmholtzPb
+    vector_bnd = tc.pb_type == MaxwellPb
+    @assert scalar_bnd ⊻ vector_bnd
     # Interior boundary condition
     if length(tc.bcs) == 2
         if tc.bcs[1] == DirichletBC
             bcΓint = DirichletBC(Γs[1],Complex{Float64}(0))
         elseif tc.bcs[1] == DirichletWeakBC
-            if tc.pb_type == HelmholtzPb
+            if scalar_bnd
                 bcΓint = DirichletWeakBC(Γs[1],Complex{Float64}(0))
-            elseif tc.pb_type == MaxwellPb
-                bcΓint = DirichletWeakBC(Γs[1],zeros(Complex{Float64},3))
-            else
-                error("Not a valid problem type.")
+            elseif vector_bnd
+                bcΓint = DirichletWeakBC(Γs[1],zeros(Complex{Float64},tc.d))
             end
         elseif tc.bcs[1] == NeumannBC
-            if tc.pb_type == HelmholtzPb
+            if scalar_bnd
                 bcΓint = NeumannBC(Γs[1],(args...)->Complex{Float64}(0))
-            elseif tc.pb_type == MaxwellPb
-                bcΓint = NeumannBC(Γs[1],(args...)->zeros(Complex{Float64},3))
-            else
-                error("Not a valid problem type.")
+            elseif vector_bnd
+                bcΓint = NeumannBC(Γs[1],(args...)->zeros(Complex{Float64},tc.d))
             end
         else
             error("Not implemented")
@@ -72,26 +68,16 @@ function (tc::ScatteringTC)(Γs::Array{Domain,1})
     elseif tc.bcs[end] == DirichletBC
         bcΓext = DirichletBC(Γs[end],Complex{Float64}(1))
     elseif tc.bcs[end] == DirichletWeakBC
-        if tc.pb_type == HelmholtzPb
+        if scalar_bnd
             bcΓext = DirichletWeakBC(Γs[end],Complex{Float64}(1))
-        elseif tc.pb_type == MaxwellPb
-            bcΓext = DirichletWeakBC(Γs[end],ones(Complex{Float64},3))
-        else
-            error("Not a valid problem type.")
+        elseif vector_bnd
+            bcΓext = DirichletWeakBC(Γs[end],ones(Complex{Float64},tc.d))
         end
     else
         error("Not implemented")
     end
     push!(pbc, bcΓext)
     return pbc
-end
-
-function get_name(tc::ScatteringTC)
-    name = "$(typeof(tc))_$(tc.pb_type)_$(tc.d)D_k$(tc.medium.k0)_$(tc.medium.name)"
-    name *= "_theta$(round(1e3*tc.θ0)/1e3)_phi$(round(1e3*tc.ϕ0)/1e3)"
-    if tc.pb_type == MaxwellPb name *= "_pol$(tc.pol)" end
-    name = prod(vcat([name,], ["_$(bc)" for bc in tc.bcs]))
-    return name
 end
 
 
@@ -104,10 +90,6 @@ struct RandomTC <: TestCase
     pb_type::DataType          # type of propagative problem
     medium::Medium             # medium
 end
-function RandomTC(;d=3, medium=medium)
-    pb_type = problem_type(medium)
-    return RandomTC(d,pb_type,medium)
-end
 function (tc::RandomTC)(Γs::Array{Domain,1})
     if tc.pb_type == HelmholtzPb
         func = (x,ielt,n) -> (Random.seed!(Int(floor(1.e6*sum(abs.(vcat(x,ielt,n))))));
@@ -117,9 +99,4 @@ function (tc::RandomTC)(Γs::Array{Domain,1})
                               (2 .*rand(Complex{Float64},3).-1))
     end
     return [RobinBC(Γ, x -> im*ccoef(tc.medium)(x), func) for Γ in Γs]
-end
-
-function get_name(tc::RandomTC)
-    name = "$(typeof(tc))_$(tc.pb_type)_$(tc.d)D_k$(tc.medium.k0)"
-    return name
 end

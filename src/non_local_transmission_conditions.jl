@@ -5,18 +5,20 @@
 """
 This is a hack, the implementation is not very clean...
 """
-function dissipative_pb(medium, Ω, pbcs)
-    pb_type = problem_type(medium)
+function dissipative_pb(pb_type, medium, Ω, pbcs)
     newBCs = Vector{BoundaryCondition}(undef,0)
     for bc in pbcs
         newbc = deepcopy(bc)
         if typeof(bc) <: RobinBC
-            if pb_type == HelmholtzPb
+            # Scalar or vector problem
+            scalar_func = pb_type == HelmholtzPb || pb_type == VectorHelmholtzPb
+            vector_func = pb_type == MaxwellPb
+            @assert scalar_func ⊻ vector_func
+            # Homogeneous Robin
+            if scalar_func
                 func = (args...)->Complex{Float64}(0)
-            elseif pb_type == MaxwellPb
-                func = (args...)->zeros(Complex{Float64},3)
-            else
-                error("Not a valid problem type.")
+            elseif vector_func
+                func = (args...)->zeros(Complex{Float64},dim(Ω))
             end
             newbc = RobinBC(bc.Γ, x -> im*ccoef(medium)(x), func)
         end
@@ -35,7 +37,7 @@ Necessarily Γ is a subset of γ = boundary(ω).
 On the part of the boundary γ which does not belong to Γ or any of the physical
 boundaries Γs, we impose robin boundary conditions.
 """
-function dissipative_pb_in_tubular_region(ω, Γ, Γs, tc, medium; fbc=:robin)
+function dissipative_pb_in_tubular_region(ω, Γ, Γs, tc, pb_type, medium; fbc=:robin)
     γ = boundary(ω)
     @assert issubset(Γ, γ)
     # Extracting tubular region
@@ -60,7 +62,7 @@ function dissipative_pb_in_tubular_region(ω, Γ, Γs, tc, medium; fbc=:robin)
     end
     filter!(bc -> !isempty(bc.Γ), pbc)
     # Returing the (dissipative) problem associated to ωstrip
-    return dissipative_pb(medium, ωstrip, pbc)
+    return dissipative_pb(pb_type, medium, ωstrip, pbc)
 end
 
 ###############################################
@@ -69,9 +71,12 @@ end
 
 struct DtN_neighbours_TP <: TransmissionParameters
     z::Complex{Float64}
+    pb_type::DataType
     medium::Medium
     fbc::Symbol          # boundary condition to impose on fictitious BCs
-    DtN_neighbours_TP(;z=1,medium=missing,fbc=:robin) = new(z,medium,fbc)
+    function DtN_neighbours_TP(;z=1,pb_type=missing,medium=missing,fbc=:robin)
+        return new(z,pb_type,medium,fbc)
+    end
 end
 mutable struct DtN_neighbours_TBC <: TransmissionBC
     tp::DtN_neighbours_TP
@@ -85,7 +90,9 @@ mutable struct DtN_neighbours_TBC <: TransmissionBC
             if issubset(Γ, γ)
                 # Adding the (dissipative) problem associated to ωstrip
                 push!(pbs, dissipative_pb_in_tubular_region(ω, Γ, Γs, tc,
-                                                            tp.medium; fbc=tp.fbc))
+                                                            tp.pb_type,
+                                                            tp.medium;
+                                                            fbc=tp.fbc))
             end
         end
         new(tp,Γ,pbs,spzeros(Float64,0,0))
@@ -202,9 +209,12 @@ This is the classic implementation of a DtN operator.
 """
 struct DtN_TP <: TransmissionParameters
     z::Complex{Float64}
+    pb_type::DataType
     medium::Medium
     fbc::Symbol          # boundary condition to impose on fictitious BCs
-    DtN_TP(;z=1,medium=missing,fbc=:robin) = new(z,medium,fbc)
+    function DtN_TP(;z=1,pb_type=missing,medium=missing,fbc=:robin)
+        return new(z,pb_type,medium,fbc)
+    end
 end
 mutable struct DtN_TBC <: TransmissionBC
     tp::DtN_TP
@@ -226,7 +236,8 @@ function matrix(m::Mesh,pb::Problem,bc::DtN_TBC)
     if length(bc.T) == 0
         # Dissipative problem
         dtn_pb = dissipative_pb_in_tubular_region(pb.Ω, bc.Γ, bc.Γs, bc.tc,
-                                                  bc.tp.medium; fbc=bc.tp.fbc)
+                                                  bc.tp.pb_type, bc.tp.medium;
+                                                  fbc=bc.tp.fbc)
         # DtN
         T = DtN(m, dtn_pb, bc.Γ)
         # Storing matrix (DDM requires at least twice its evaluation)
@@ -239,7 +250,8 @@ function apply(A,m::Mesh,pb::Problem,bc::DtN_TBC)
     @assert boundary(pb.Ω) == bc.Γ
     # Dissipative problem
     dtn_pb = dissipative_pb_in_tubular_region(pb.Ω, bc.Γ, bc.Γs, bc.tc,
-                                                bc.tp.medium; fbc=bc.tp.fbc)
+                                              bc.tp.pb_type, bc.tp.medium;
+                                              fbc=bc.tp.fbc)
     # For information: how much does the operator cost?
     NT = number_of_elements(m, dtn_pb.Ω, dofdim(dtn_pb))
     Npb = number_of_elements(m, pb.Ω, dofdim(pb))
@@ -256,7 +268,8 @@ function rhs(b,m::Mesh,pb::Problem,bc::DtN_TBC)
     @assert boundary(pb.Ω) == bc.Γ
     # Dissipative problem
     dtn_pb = dissipative_pb_in_tubular_region(pb.Ω, bc.Γ, bc.Γs, bc.tc,
-                                                bc.tp.medium; fbc=bc.tp.fbc)
+                                              bc.tp.pb_type, bc.tp.medium;
+                                              fbc=bc.tp.fbc)
     # size of new RHS
     NΣ = number_of_elements(m,bc.Γ,dofdim(pb))
     Naux = length(get_rhs(m,dtn_pb)) - NΣ

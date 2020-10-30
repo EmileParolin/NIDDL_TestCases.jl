@@ -57,14 +57,18 @@ Hence
 
     (-n ⋅ ∇ + iσ k) pw(x) = iσ k (-n⋅d + 1) pw(x)
 """
-function absorbing_condition(pw::AcousticPW)
+function absorbing_condition(pb_type,pw::AcousticPW)
     a = acoef(pw.medium)
     c = ccoef(pw.medium)
     k0 = pw.medium.k0
-    return (x,ielt,n) -> im * (- k0 * (n⋅pw.d) * a(x) + c(x)) * pw(x)
+    if pb_type == HelmholtzPb
+        return (x,ielt,n) -> im * (- k0 * (n⋅pw.d) * a(x) + c(x)) * pw(x)
+    elseif pb_type == VectorHelmholtzPb
+        return (x,ielt,n) -> k0 * (- k0 * (n⋅pw.d) * a(x) + c(x)) * pw(x)
+    end
 end
 
-function neumann_condition(pw::AcousticPW)
+function neumann_condition(pb_type,pw::AcousticPW)
     a = acoef(pw.medium)
     k0 = pw.medium.k0
     return (x,ielt,n) -> im * k0 * (n⋅pw.d) * a(x) * pw(x)
@@ -134,13 +138,15 @@ Hence
 
     [n × curl ⋅ + iσ k n × (⋅ × n)] pw(x) = iσ k [n × (d × pw(x)) + n × (pw(x) × n)]
 """
-function absorbing_condition(pw::ElectromagneticPW)
+function absorbing_condition(pb_type, pw::ElectromagneticPW)
+    @assert pb_type==MaxwellPb
     a = acoef(pw.medium)
     c = ccoef(pw.medium)
     k0 = pw.medium.k0
     return (x,ielt,n) -> im * (k0 * a(x) * (n × (pw.d × pw(x))) + c(x) * (n × (pw(x) × n)))
 end
-function neumann_condition(pw::ElectromagneticPW)
+function neumann_condition(pb_type, pw::ElectromagneticPW)
+    @assert pb_type==MaxwellPb
     a = acoef(pw.medium)
     k0 = pw.medium.k0
     return (x,ielt,n) -> im * k0 * a(x) * (n × (pw.d × pw(x)))

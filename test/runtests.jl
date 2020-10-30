@@ -93,13 +93,16 @@ Nits = Dict((2, AcousticMedium, :basic)
                                 interior=true, nΩ=2, mode=:geo, nl=0),
                         LayersGeo(;d=d, shape=[:circle, :sphere][d-1], as=[     1,],
                                 interior=true, nΩ=2, mode=:metis, nl=0), ]
-                tcs = [ScatteringTC(;d=d, medium=medium, θ0=π/2, ϕ0=0, bcs=[RobinBC,]),]
+                pb_type = typeof(medium) == AcousticMedium ? HelmholtzPb : MaxwellPb
+                tcs = [ScatteringTC(;d=d, pb_type, medium=medium, θ0=π/2, ϕ0=0, bcs=[RobinBC,]),]
                 solvers = [Jacobi_S(;tol=1e-10, maxit=1000000, r=0.5, light_mode=false),
                            GMRES_S(;tol=1e-10, maxit=100000, light_mode=false), ]
                 local Πinvolution, Nits_test, solution_found
                 @testset "Exchange type : standard" begin
                     tps = [DespresTP(;z=1), SndOrderTP(;z=1,α=1/(2*k^2)),
-                           DtN_neighbours_TP(;z=1,medium=dissipative_medium(medium),fbc=:robin),]
+                           DtN_neighbours_TP(;z=1, pb_type=pb_type,
+                                             medium=dissipative_medium(medium),
+                                             fbc=:robin),]
                     dds = [OnionDDM(;implicit=false),
                            OnionDDM(;implicit=true),]
                     info = andiamo(geos=geos, Nλs=Nλs, tcs=tcs, tps=tps,
@@ -148,7 +151,9 @@ Nits = Dict((2, AcousticMedium, :basic)
                 end
                 @testset "Exchange type : projection" begin
                     tps = [DespresTP(;z=1), SndOrderTP(;z=1,α=1/(2*k^2)),
-                           DtN_TP(;z=1,medium=dissipative_medium(medium),fbc=:robin),]
+                           DtN_TP(;z=1, pb_type=pb_type,
+                                  medium=dissipative_medium(medium),
+                                  fbc=:robin),]
                     dds = [JunctionsDDM(;implicit=false, precond=true),
                            JunctionsDDM(;implicit=true,  precond=true),]
                     info = andiamo(geos=geos, Nλs=Nλs, tcs=tcs, tps=tps,

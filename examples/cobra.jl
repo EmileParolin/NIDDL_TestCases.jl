@@ -1,7 +1,6 @@
 using Pkg
 Pkg.activate("./")
 using NIDDL
-include("/Users/emile/phd/NIDDL/src/gmsh.jl")
 
 
 function build_cobra_mesh(;h=0.01,nΩ=1,name="", gmsh_info=10)

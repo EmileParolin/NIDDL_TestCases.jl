@@ -41,8 +41,6 @@ struct Idl2TBC <: TransmissionBC
     Γ::Domain
 end
 (tp::Idl2TP)(Γ::Domain; kwargs...) = Idl2TBC(tp, Γ)
-get_name(tp::Idl2TP) = "$(typeof(tp))_z$(tp.z)"
-get_label(tp::Idl2TP) = "\${\\rm Id}\$"
 
 function matrix(m::Mesh,pb::Problem,bc::Idl2TBC)
     N = number_of_elements(m,bc.Γ,dofdim(pb))
@@ -63,8 +61,6 @@ struct DespresTBC <: TransmissionBC
     Γ::Domain
 end
 (tp::DespresTP)(Γ::Domain; kwargs...) = DespresTBC(tp, Γ)
-get_name(tp::DespresTP) = "$(typeof(tp))_z$(tp.z)"
-get_label(tp::DespresTP) = "\${\\rm Despres}\$"
 
 function matrix(m::Mesh,pb::Problem,bc::DespresTBC)
     RΓ = restriction(m, bc.Γ, dofdim(pb))
@@ -99,8 +95,6 @@ struct SndOrderTBC <: TransmissionBC
     Γ::Domain
 end
 (tp::SndOrderTP)(Γ::Domain; kwargs...) = SndOrderTBC(tp, Γ)
-get_name(tp::SndOrderTP) = "$(typeof(tp))_z$(tp.z)_a$(tp.α)"
-get_label(tp::SndOrderTP) = "\${\\rm 2nd order}\$"
 
 function matrix(m::Mesh,pb::Problem,bc::SndOrderTBC)
     RΓ = restriction(m, bc.Γ, dofdim(pb))

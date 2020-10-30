@@ -7,11 +7,6 @@ struct MaxwellPb <: Problem
     BCs::Array{BoundaryCondition,1}
 end
 
-"""
-Type of problem that can be solved in this medium.
-"""
-problem_type(m::ElectromagneticMedium) = MaxwellPb
-
 dofdim(pb::MaxwellPb) = 1 # DOFs are edges (RT0 = 1st order RT)
 functype(pb::MaxwellPb) = VecTriFunc
 unknown_fe_type(Ω::Domain,pb::MaxwellPb) = dim(Ω) == 3 ? NEDtet : NEDtri

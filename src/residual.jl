@@ -1,5 +1,6 @@
 function get_resfunc(m,fullpb,pbs,ddm,uexact,solver;
-                     save_solutions_it=false, prefix="")
+                     save_solutions_it=false,
+                     prefix="", name="")
     norms = Dict{Symbol,Function}()
     # discrete and continuous L2 norm on the interface traces
     norms[:l2t] = (it) -> norm(ddm.b .- (solver.x .- solver.Ax))
@@ -23,17 +24,21 @@ function get_resfunc(m,fullpb,pbs,ddm,uexact,solver;
         function savefunc(it)
             # Solutions
             uis = [ld.Li.ui + ld.Fi for ld in ddm.lds]
+            if it == 0
+                for ui in uis
+                    ui .= 0. # For better visualization
+                end
+            end
             save_vector_partition(m, [pb.Ω for pb in pbs],
                                     [[("u",toP1(pb, m, pb.Ω, ui))]
                                     for (pb, ui) in zip(pbs, uis)],
-                                    prefix*"u_$(it)")
+                                    prefix*"u_$(name)_$(it)")
             # Errors
             if !(solver.light_mode)
-                uis = [ld.Li.ui + ld.Fi for ld in ddm.lds]
                 save_vector_partition(m, [pb.Ω for pb in pbs],
                                         [[("e",toP1(pb, m, pb.Ω, uexacti.-ui))]
                                         for (pb, ui, uexacti) in zip(pbs, uis, uexactis)],
-                                        prefix*"e_$(it)")
+                                        prefix*"e_$(name)_$(it)")
             end
         end
         return (it) -> (savefunc(it); resfunc(it))

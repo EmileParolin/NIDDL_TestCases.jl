@@ -23,7 +23,7 @@ function construct_mesh(; d=2, shape=:circle, as=[1,], interior=true, h=0.1,
     d == 2 && @assert shape in [:circle, :square]
     d == 3 && @assert shape in [:sphere, :box, :cylinder, :cone]
     nPhysicalBC = interior ? 1 : 2
-    if !(mode == :metis)
+    if mode == :cad || mode == :geo
         @assert length(as)-nPhysicalBC == nΩ-1
     else
         @assert length(as) == nPhysicalBC

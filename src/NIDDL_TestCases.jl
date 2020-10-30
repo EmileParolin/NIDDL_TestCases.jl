@@ -43,6 +43,7 @@ include("geometry.jl")
 include("medium.jl")
 include("planewave.jl")
 include("helmholtz.jl")
+include("vector_helmholtz.jl")
 include("maxwell.jl")
 include("test_case.jl")
 include("DtN.jl")
@@ -87,6 +88,9 @@ export
     HelmholtzPb,
     dofdim,
 
+    # vector_helmholtz.jl
+    VectorHelmholtzPb,
+
     # maxwell.jl
     MaxwellPb,
     PNEDtoP1,
@@ -97,7 +101,6 @@ export
     AcousticMedium,
     ElectromagneticMedium,
     dissipative_medium,
-    problem_type,
     speed,
     wavenumber,
     acoef, bcoef, ccoef,

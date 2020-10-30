@@ -14,11 +14,6 @@ function LayersGeo(;d=2, shape=:circle, as=[1,], interior=false, nΩ=2,
     LayersGeo(d, shape, as, interior, nΩ, mode, nl, layer_from_PBC)
 end
 
-get_name(geo::LayersGeo) = prod(vcat("$(typeof(geo))_$(geo.shape)",
-                                     ["_a$(round(1e8*a)/1e8)" for a in geo.as[1:min(3,length(geo.as))]],
-                                     "_int$(Int(geo.interior))_n$(geo.nΩ)_$(geo.mode)",
-                                     "_nl$(geo.nl)"))
-
 
 """
 Return the object `m::Mesh`, the domain `Ω` of the problem and an array `Γs`
@@ -110,6 +105,7 @@ function get_problems(g::LayersGeo, tc::TestCase, Ωs::Vector{Domain},
         γΣ = setdiff(γ, intersect(γ, Γ)) # γ \ (γ ∩ Γ)
         Σs = [intersect(γΣ, boundary(oω)) for oω in Ωs if oω != ω]
         filter!(σ -> !isempty(σ), Σs)
+        filter!(σ -> dim(σ) == dim(γ), Σs)
         tbcs = [tp(Σ; geo=g, Ωs=Ωs, Γs=Γs, tc=tc) for Σ in Σs]
         # Local problem
         pb = tc.pb_type(tc.medium,ω,vcat(pbc, tbcs))
