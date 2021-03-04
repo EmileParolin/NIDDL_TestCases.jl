@@ -25,7 +25,7 @@ function andiamo(;geos=Geometry[], Nλs=[20,], tcs=TestCase[],
                         # Exact discrete solution
                         uexact = solve(m,fullpb)
                         # DDM
-                        gid = InputData(m, fullpb, pbs)
+                        gid = StandardInputData(m, fullpb, pbs)
                         ddm = DDM(pbs, gid, dd);
                         for solver in solvers
                             # Testing that we find the correct solution

@@ -1,13 +1,23 @@
 """
 Maxwell problem
 """
-struct MaxwellPb <: Problem
+mutable struct MaxwellPb <: Problem
     medium::ElectromagneticMedium
     Ω::Domain
     BCs::Array{BoundaryCondition,1}
+    b0::Vector{Complex{Float64}}     # RHS
+end
+function MaxwellPb(medium, Ω, BCs)
+    b0 = Vector{Complex{Float64}}(undef, 0)
+    return MaxwellPb(medium, Ω, BCs, b0)
 end
 
-dofdim(pb::MaxwellPb) = 1 # DOFs are edges (RT0 = 1st order RT)
+"""
+    DOFs are edges (RT0 = 1st order RT).
+"""
+dofdim(pb::MaxwellPb) = 1
+dofdim(::Type{<:MaxwellPb}) = 1
+
 functype(pb::MaxwellPb) = VecTriFunc
 unknown_fe_type(Ω::Domain,pb::MaxwellPb) = dim(Ω) == 3 ? NEDtet : NEDtri
 D_unknown_fe_type(Ω::Domain,pb::MaxwellPb) = dim(Ω) == 3 ? curlNEDtet : curlNEDtri

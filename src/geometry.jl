@@ -1,3 +1,16 @@
+"""
+    LayersGeo(;d=2, shape=:circle, as=[1,], interior=false, nΩ=2,
+              mode=:metis, nl=0, layer_from_PBC=true,)
+
+- d::Integer           # embbeding domain dimension
+- shape::Symbol        # geometry of physical boundaries
+- as::Vector{Real}     # vector of characteristic size of physical boundaries
+- interior::Bool       # whether or not to mesh inside
+- nΩ::Integer          # number of partition domains
+- mode::Symbol         # type of partitionning (:cad, :geo, :metis)
+- nl::Integer          # number of layers of cell for interior layering
+- layer_from_PBC::Bool # whether or not layering from physical boundaries
+"""
 mutable struct LayersGeo <: Geometry
     d::Integer           # embbeding domain dimension
     shape::Symbol        # geometry of physical boundaries
@@ -43,6 +56,7 @@ function get_mesh_and_domains(g::LayersGeo, h; name="")
         info = interior_layering(m, Ω, Γs, g.d, g.nl, g.layer_from_PBC)
         vtx, eltdoms, elt2vtx, elttags, grps, new2old_bndtags = info
         # Re-Constructing Mesh
+        m = Mesh(vtx, elt2vtx..., elttags)
         # Re-Constructing Domains
         noddoms, edgdoms, tridoms, tetdoms = eltdoms
         @info "Creating domains"
@@ -140,4 +154,36 @@ function get_problems(g::LayersGeo, tc::TestCase, Ωs::Vector{Domain},
         push!(pbs, pb)
     end
     return fullpb, pbs
+end
+
+
+function get_skeleton_problems(m::Mesh, Ω::Domain, Ωs::Vector{Domain},
+                               pb_type::DataType, k,
+                               tp::TransmissionParameters)
+    Σ = skeleton(Ω)
+    d = dofdim(pb_type)
+    ws = dof_weights(m, Ω, Ωs, d)
+    # The weights are incorporated in the medium characteristics
+    if pb_type == HelmholtzPb
+        ρr = (x, ielt) -> 1 / ws[ielt]
+        κr = (x, ielt) -> -1 / ws[ielt]
+        medium = AcousticMedium(;k0=k, ρr=ρr, κr=κr, name="weights")
+    elseif pb_type == MaxwellPb
+        μr = (x, ielt) -> 1 / ws[ielt]
+        ϵr = (x, ielt) -> -ws[ielt]
+        medium = ElectromagneticMedium(;k0=k, μr=μr, ϵr=ϵr, name="weights")
+    end
+    # Full problem
+    b0 = zeros(Complex{Float64}, number_of_elements(m, Σ, d))
+    Σfullpb = pb_type(medium, Σ, BoundaryCondition[], b0)
+    # Local problems
+    Σpbs = Vector{pb_type}(undef,0)
+    for σe in Σ
+        σ = Domain(σe)
+        γ = boundary(σ)
+        tbc = tp(γ)
+        pb = pb_type(medium, σ, [tbc,])
+        push!(Σpbs, pb)
+    end
+    return Σfullpb, Σpbs
 end

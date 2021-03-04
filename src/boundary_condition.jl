@@ -86,7 +86,7 @@ function apply(A,m::Mesh,pb::Problem,bc::RobinBC)
     # Taking care of potential auxiliary equations
     RΩ = restriction(m, pb.Ω, dofdim(pb))
     MAtoΩ = sparse(I, number_of_elements(m,pb.Ω,dofdim(pb)), size(A,1))
-    return A - transpose(MAtoΩ)*RΩ * M * transpose(RΩ)*MAtoΩ
+    return A #- transpose(MAtoΩ)*RΩ * M * transpose(RΩ)*MAtoΩ
 end
 
 #################

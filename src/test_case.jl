@@ -62,7 +62,7 @@ function (tc::ScatteringTC)(Γs::Array{Domain,1})
     # Exterior boundary condition
     if tc.bcs[end] == RobinBC
         # First order absorbing BC
-        bcΓext = RobinBC(Γs[end], x -> im*ccoef(tc.medium)(x), f_Robin)
+        bcΓext = RobinBC(Γs[end], (x,ielt) -> im*ccoef(tc.medium)(x,ielt), f_Robin)
     elseif tc.bcs[end] == NeumannBC
         bcΓext = NeumannBC(Γs[end],f_Neumann)
     elseif tc.bcs[end] == DirichletBC
@@ -98,5 +98,5 @@ function (tc::RandomTC)(Γs::Array{Domain,1})
         func = (x,ielt,n) -> (Random.seed!(Int(floor(1.e6*sum(abs.(vcat(x,ielt,n))))));
                               (2 .*rand(Complex{Float64},3).-1))
     end
-    return [RobinBC(Γ, x -> im*ccoef(tc.medium)(x), func) for Γ in Γs]
+    return [RobinBC(Γ, (x,ielt) -> im*ccoef(tc.medium)(x,ielt), func) for Γ in Γs]
 end

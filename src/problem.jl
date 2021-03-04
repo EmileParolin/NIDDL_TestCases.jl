@@ -9,6 +9,8 @@ function quadrature(Ω::Domain)
         return triquad[3]
     elseif dim(Ω) == 1
         return edgquad[2]
+    elseif dim(Ω) == 0
+        return nodquad[1]
     else
         error("No quadrature is defined for a domain with dimension $(dim(Ω))")
     end
@@ -89,6 +91,11 @@ end
 function get_rhs(m::Mesh,pb::Problem)
     # Initialisation
     b = zeros(Complex{Float64}, number_of_elements(m, pb.Ω, dofdim(pb)))
+    # Volume contribution
+    if length(pb.b0) > 0
+        @assert length(pb.b0) == length(b)
+        b = pb.b0
+    end
     # Applying physical boundary conditions
     for bc in filter(bc->typeof(bc) <: PhysicalBC, pb.BCs)
         [@assert tag in tags(boundary(pb.Ω)) for tag in tags(bc.Γ)]

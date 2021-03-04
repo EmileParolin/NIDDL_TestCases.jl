@@ -5,6 +5,7 @@ struct VectorHelmholtzPb <: Problem
     medium::AcousticMedium
     Ω::Domain
     BCs::Array{BoundaryCondition,1}
+    b0::Vector{Complex{Float64}}     # RHS
 end
 
 dofdim(pb::VectorHelmholtzPb) = 1 # DOFs are edges

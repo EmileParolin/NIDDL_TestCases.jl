@@ -20,7 +20,7 @@ function dissipative_pb(pb_type, medium, Ω, pbcs)
             elseif vector_func
                 func = (args...)->zeros(Complex{Float64},dim(Ω))
             end
-            newbc = RobinBC(bc.Γ, x -> im*ccoef(medium)(x), func)
+            newbc = RobinBC(bc.Γ, (x, ielt) -> im*ccoef(medium)(x, ielt), func)
         end
         if !(typeof(bc) <: DirichletWeakBC)
             push!(newBCs, newbc)

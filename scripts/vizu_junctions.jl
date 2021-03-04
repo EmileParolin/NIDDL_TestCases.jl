@@ -1,27 +1,15 @@
-using Revise
-using Pkg
+using Revise, Pkg, Test
 Pkg.activate("./")
-Pkg.update("NIDDL_FEM")
-Pkg.update("NIDDL")
-using LinearAlgebra
-using SparseArrays
-using SuiteSparse
-using SharedArrays
-using Distributed
-using LinearMaps
-using IterativeSolvers
-using TimerOutputs
-using NIDDL_FEM
-using NIDDL
-using NIDDL_TestCases
-using Test
+using LinearAlgebra, SparseArrays, SuiteSparse, SharedArrays, Distributed
+using LinearMaps, IterativeSolvers, TimerOutputs
+using NIDDL_FEM, NIDDL, NIDDL_TestCases
 prefix = pwd() * "/data/"
 
 ## Helper function
-function run(d, k, Nλ, as, tc, nΩ, tp, dd, name)
+function run(d, k, Nλ, as, tc, nΩ, tp, dd, name; interior=false)
     # Geometry, mesh and domains
     g = LayersGeo(;d=d, shape=[:circle,:sphere,][d - 1], as=as,
-                interior=false, nΩ=nΩ, mode=:metis)
+                interior=interior, nΩ=nΩ, mode=:metis)
     h = 2π / abs(k) / max(5, Nλ);
     m, Ωs, Γs = get_mesh_and_domains(g, h; name=prefix * name);
     Ω = union(Ωs...);
@@ -55,7 +43,7 @@ Nλ = 200
 as = [0.5,1,]
 medium = AcousticMedium(;k0=k)
 tc = ScatteringTC(;d=d, pb_type=pb_type, medium=medium, bcs=[NeumannBC, RobinBC,])
-# Runs Local vs NonLocal
+## Runs Local vs NonLocal
 nΩ = 9
 postfix = "without_xpt"
 tag = "k$(k)_n$(nΩ)_Nl$(Nλ)_"
@@ -65,7 +53,7 @@ run(d, k, Nλ, as, tc, nΩ, tp, dd, tag*"Onion_Local_$(postfix)")
 tp = DtN_neighbours_TP(;z=1,pb_type=pb_type,medium=dissipative_medium(medium),fbc=:robin)
 dd = OnionDDM(;implicit=true)
 run(d, k, Nλ, as, tc, nΩ, tp, dd, tag*"Onion_NonLocal_$(postfix)")
-# Runs Onion vs Junctions
+## Runs Onion vs Junctions
 nΩ = 10
 postfix = "with_xpt"
 tag = "k$(k)_n$(nΩ)_Nl$(Nλ)_"
@@ -75,6 +63,10 @@ run(d, k, Nλ, as, tc, nΩ, tp, dd, tag*"Onion_NonLocal_$(postfix)")
 tp = DtN_TP(;z=1,pb_type=pb_type,medium=dissipative_medium(medium),fbc=:robin)
 dd = JunctionsDDM(;implicit=true, precond=true)
 run(d, k, Nλ, as, tc, nΩ, tp, dd, tag*"Junctions_NonLocal_$(postfix)")
+# And also Local
+tp = DespresTP(;z=1)
+dd = OnionDDM(;implicit=true)
+run(d, k, Nλ, as, tc, nΩ, tp, dd, tag*"Onion_Local_$(postfix)")
 
 ## Medium frequency
 k = 5
@@ -129,3 +121,19 @@ run(d, k, Nλ, as, tc, nΩ, tp, dd, tag*"Onion_NonLocal_$(postfix)")
 tp = DtN_TP(;z=1,pb_type=pb_type,medium=dissipative_medium(medium),fbc=:robin)
 dd = JunctionsDDM(;implicit=true, precond=true)
 run(d, k, Nλ, as, tc, nΩ, tp, dd, tag*"Junctions_NonLocal_$(postfix)")
+
+##########################
+
+## Varicelle
+k = 1
+Nλ = 200
+as = [1,]
+medium = AcousticMedium(;k0=k)
+tc = ScatteringTC(;d=d, pb_type=pb_type, medium=medium, bcs=[RobinBC,])
+# Runs Onion vs Junctions
+nΩ = 10
+postfix = "varicelle"
+tag = "k$(k)_n$(nΩ)_Nl$(Nλ)_"
+tp = DtN_neighbours_TP(;z=1,pb_type=pb_type,medium=dissipative_medium(medium),fbc=:robin)
+dd = OnionDDM(;implicit=true)
+run(d, k, Nλ, as, tc, nΩ, tp, dd, tag*"Onion_NonLocal_$(postfix)"; interior=true)

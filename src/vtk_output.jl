@@ -19,6 +19,10 @@ function get_points_cells(m::Mesh,Ω::Domain; write_boundary=false)
         for it in element_indices(m,Ω,2)
             push!(cells, MeshCell(VTKCellTypes.VTK_TRIANGLE, m.tri2vtx[:,it]))
         end
+    elseif dim(Ω) == 1
+        for it in element_indices(m,Ω,1)
+            push!(cells, MeshCell(VTKCellTypes.VTK_LINE, m.edg2vtx[:,it]))
+        end
     end
     points = m.vtx
 	return points, cells
@@ -136,7 +140,8 @@ function save_medium(m::Mesh, Ω::Domain, medium::AcousticMedium, name::String)
     vtkfile = get_vtkfile(m,Ω,name*"_"*medium.name)
     # Getting correct elements on which the loop is performed
     d = dim(Ω)
-    if d == 2 elt2vtx = m.tri2vtx
+    if d == 1 elt2vtx = m.edg2vtx
+    elseif d == 2 elt2vtx = m.tri2vtx
     elseif d == 3 elt2vtx = m.tet2vtx
     end
     # Initialisation
@@ -146,8 +151,8 @@ function save_medium(m::Mesh, Ω::Domain, medium::AcousticMedium, name::String)
     for ielt in 1:size(elt2vtx,2)
         s = m.vtx[:,elt2vtx[:,ielt]] # element vertices
         g = sum(s, dims=2) ./ size(s,2) # barycenter
-        ρ[ielt] = medium.ρr(g)
-        κ[ielt] = medium.κr(g)
+        ρ[ielt] = medium.ρr(g, ielt)
+        κ[ielt] = medium.κr(g, ielt)
     end
     vtk_cell_data(vtkfile, real.(ρ), "real rho")
     vtk_cell_data(vtkfile, imag.(ρ), "imag rho")
@@ -171,8 +176,8 @@ function save_medium(m::Mesh, Ω::Domain, medium::ElectromagneticMedium, name::S
     for ielt in 1:size(elt2vtx,2)
         s = m.vtx[:,elt2vtx[:,ielt]] # element vertices
         g = sum(s, dims=2) ./ size(s,2) # barycenter
-        μ[ielt] = medium.μr(g)
-        ϵ[ielt] = medium.ϵr(g)
+        μ[ielt] = medium.μr(g, ielt)
+        ϵ[ielt] = medium.ϵr(g, ielt)
     end
     vtk_cell_data(vtkfile, real.(μ), "real mu")
     vtk_cell_data(vtkfile, imag.(μ), "imag mu")

@@ -1,4 +1,7 @@
-struct InputData <: AbstractInputData
+abstract type InputData <: AbstractInputData end
+
+
+struct StandardInputData <: InputData
     m::Mesh
     d::Integer                    # Dimension of DOF ∈ {0,1}
     Ω::Domain                     # Full domain
@@ -7,8 +10,8 @@ struct InputData <: AbstractInputData
     NΣis::Vector{Int64}           # Size of local transmission boundaries
     dof_weights::Vector{Int64}    # Number of domains a DOF belongs to
 end
-function InputData(m::Mesh, fullpb::P,
-                   pbs::Vector{P}) where P <: AbstractProblem
+function StandardInputData(m::Mesh, fullpb::P,
+                           pbs::Vector{P}) where P <: AbstractProblem
     # Dimension of DOFs
     d = dofdim(fullpb)
     # Domains
@@ -22,11 +25,53 @@ function InputData(m::Mesh, fullpb::P,
     NΩis = [number_of_elements(m,ω,d) for ω in Ωs]
     NΣis = [number_of_elements(m,σ,d) for σ in Σs]
     # Number of domains a DOF belongs to
-    dof_weights = zeros(Int64, number_of_elements(m,d))
+    ws = dof_weights(m, Ω, Ωs, d)
+    StandardInputData(m, d, Ω, Σ, NΩis, NΣis, ws)
+end
+
+struct InductiveInputData <: InputData
+    m::Mesh
+    d::Integer                    # Dimension of DOF ∈ {0,1}
+    Ω::Domain                     # Full domain
+    Σ::Domain                     # Full skeleton
+    NΩis::Vector{Int64}           # Size of local problems
+    NΣis::Vector{Int64}           # Size of local transmission boundaries
+    dof_weights::Vector{Int64}    # Number of domains a DOF belongs to
+    Σfullpb
+    Σpbs
+    Σgid
+    Σsolver
+    Σddm
+    Σresfunc
+end
+function InductiveInputData(m::Mesh, fullpb::P,
+                            pbs::Vector{P}, Σfullpb, Σpbs, Σgid,
+                            Σsolver, Σddm, Σresfunc) where P <: AbstractProblem
+    # Dimension of DOFs
+    d = dofdim(fullpb)
+    # Domains
+    Ω = fullpb.Ω
+    Σ = union(Domain.(unique(vcat([transmission_boundary(pb)[:] for pb in pbs]...)))...)
+    Ωs = [pb.Ω for pb in pbs] 
+    Σs = [transmission_boundary(pb) for pb in pbs] 
+    # Size
+    @info "   --> #DOF volume   $(number_of_elements(m,Ω,d))"
+    @info "   --> #DOF skeleton $(number_of_elements(m,Σ,d))"
+    NΩis = [number_of_elements(m,ω,d) for ω in Ωs]
+    NΣis = [number_of_elements(m,σ,d) for σ in Σs]
+    # Number of domains a DOF belongs to
+    ws = dof_weights(m, Ω, Ωs, d)
+    InductiveInputData(m, d, Ω, Σ, NΩis, NΣis, ws, Σfullpb, Σpbs, Σgid, Σsolver, Σddm, Σresfunc)
+end
+
+
+function dof_weights(m, Ω, Ωs, d)
+    ws = zeros(Int64, number_of_elements(m, d))
     for ω in Ωs
-        dof_weights[element_indices(m,ω,d)] .+= 1
+        ws[element_indices(m, ω, d)] .+= 1
     end
-    InputData(m, d, Ω, Σ, NΩis, NΣis, dof_weights)
+    ind_Ω = element_indices(m, Ω, d)
+    return ws[ind_Ω]
 end
 
 

@@ -62,16 +62,16 @@ function absorbing_condition(pb_type,pw::AcousticPW)
     c = ccoef(pw.medium)
     k0 = pw.medium.k0
     if pb_type == HelmholtzPb
-        return (x,ielt,n) -> im * (- k0 * (n⋅pw.d) * a(x) + c(x)) * pw(x)
+        return (x,ielt,n) -> im * (- k0 * (n⋅pw.d) * a(x,ielt) + c(x,ielt)) * pw(x)
     elseif pb_type == VectorHelmholtzPb
-        return (x,ielt,n) -> k0 * (- k0 * (n⋅pw.d) * a(x) + c(x)) * pw(x)
+        return (x,ielt,n) -> k0 * (- k0 * (n⋅pw.d) * a(x,ielt) + c(x,ielt)) * pw(x)
     end
 end
 
 function neumann_condition(pb_type,pw::AcousticPW)
     a = acoef(pw.medium)
     k0 = pw.medium.k0
-    return (x,ielt,n) -> im * k0 * (n⋅pw.d) * a(x) * pw(x)
+    return (x,ielt,n) -> im * k0 * (n⋅pw.d) * a(x,ielt) * pw(x)
 end
 
 function get_planewave(medium::AcousticMedium,θ0,ϕ0,args...)
@@ -143,13 +143,13 @@ function absorbing_condition(pb_type, pw::ElectromagneticPW)
     a = acoef(pw.medium)
     c = ccoef(pw.medium)
     k0 = pw.medium.k0
-    return (x,ielt,n) -> im * (k0 * a(x) * (n × (pw.d × pw(x))) + c(x) * (n × (pw(x) × n)))
+    return (x,ielt,n) -> im * (k0 * a(x,ielt) * (n × (pw.d × pw(x))) + c(x,ielt) * (n × (pw(x) × n)))
 end
 function neumann_condition(pb_type, pw::ElectromagneticPW)
     @assert pb_type==MaxwellPb
     a = acoef(pw.medium)
     k0 = pw.medium.k0
-    return (x,ielt,n) -> im * k0 * a(x) * (n × (pw.d × pw(x)))
+    return (x,ielt,n) -> im * k0 * a(x,ielt) * (n × (pw.d × pw(x)))
 end
 
 function get_planewave(medium::ElectromagneticMedium,θ0,ϕ0,pol)

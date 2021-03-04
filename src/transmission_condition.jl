@@ -64,7 +64,7 @@ end
 
 function matrix(m::Mesh,pb::Problem,bc::DespresTBC)
     RΓ = restriction(m, bc.Γ, dofdim(pb))
-    coef = x -> ccoef(pb.medium)(x) / pb.medium.k0
+    coef = (x, ielt) -> ccoef(pb.medium)(x, ielt) / pb.medium.k0
     M = RΓ * get_mass_matrix(m,bc.Γ,pb; coef=coef) * transpose(RΓ)
     return pb.medium.k0 * bc.tp.z * M
 end

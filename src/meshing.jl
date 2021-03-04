@@ -19,7 +19,8 @@ in the mesh.
 """
 function construct_mesh(; d=2, shape=:circle, as=[1,], interior=true, h=0.1,
                         nΩ=1, mode=:metis, name="", gmsh_info=10)
-    @assert d in [2,3] "Incorrect dimension d = $(d), should be 2 or 3."
+    @assert d in [1,2,3] "Incorrect dimension d = $(d), should be 1, 2 or 3."
+    d == 1 && @assert shape in [:line,]
     d == 2 && @assert shape in [:circle, :square]
     d == 3 && @assert shape in [:sphere, :box, :cylinder, :cone]
     nPhysicalBC = interior ? 1 : 2
@@ -50,7 +51,12 @@ function construct_mesh(; d=2, shape=:circle, as=[1,], interior=true, h=0.1,
     @info "Creating geometry"
     shell_tags = Int64[]
     for ai in as_cad
-        if d == 2
+        if d == 1
+            @assert length(as_cad) == 1 "In 1D, only define a single line."
+            tbeg = gmsh.model.occ.addPoint(0, 0, 0)
+            tend = gmsh.model.occ.addPoint(as_cad[1], 0, 0)
+            append!(shell_tags, [tbeg, tend])
+        elseif d == 2
             if shape==:circle
                 push!(shell_tags, gmsh.model.occ.addDisk(0, 0, 0, ai, ai))
             elseif shape==:square
@@ -75,14 +81,18 @@ function construct_mesh(; d=2, shape=:circle, as=[1,], interior=true, h=0.1,
         push!(layers, reverse(shell_tags[ias:ias+1]))
     end
     for layer in layers
-        if d == 2
+        if d == 1
+            tag = gmsh.model.occ.addLine(shell_tags...)
+        elseif d == 2
             tag = gmsh.model.occ.addPlaneSurface(layer)
         elseif d == 3
             tag = gmsh.model.occ.addVolume(layer)
         end
     end
     # Removing the temporary domains
-    gmsh.model.occ.remove([(d,st) for st in shell_tags])
+    if d in [2, 3]
+        gmsh.model.occ.remove([(d,st) for st in shell_tags])
+    end
     # Meshing
     @info "Meshing"
     gmsh.model.occ.synchronize()
@@ -146,8 +156,10 @@ function construct_mesh(; d=2, shape=:circle, as=[1,], interior=true, h=0.1,
         edginfo = detect_junction_points(elt2vtx[3], elttags[3], 1)
         eltdoms[2], elt2vtx[2], elttags[2] = edginfo
     end
-    nodinfo = detect_junction_points(elt2vtx[2], elttags[2], 0)
-    eltdoms[1], elt2vtx[1], elttags[1] = nodinfo
+    if d in [2, 3]
+        nodinfo = detect_junction_points(elt2vtx[2], elttags[2], 0)
+        eltdoms[1], elt2vtx[1], elttags[1] = nodinfo
+    end
     # Reformating
     elttags = merge(elttags...)
     return vtx, eltdoms, elt2vtx, elttags, geobnd2vtx, geobnd_tags
@@ -588,7 +600,9 @@ function construct_domains(d::Integer, m::Mesh, eltdoms, geobnd2vtx,
             # Loop on all entities of dim d-1
             for γ in skeleton(Ω)
                 # First element of γ
-                if dim(γ) == 1
+                if dim(γ) == 0
+                    bnd2vtx = m.nod2vtx
+                elseif dim(γ) == 1
                     bnd2vtx = m.edg2vtx
                 elseif dim(γ) == 2
                     bnd2vtx = m.tri2vtx
@@ -654,10 +668,18 @@ boundary.  Boundary parts starting from the domains `Γs` are ignored.
 """
 function element_layer(m::Mesh, Ω::Domain, Γs::Vector{Domain}, d::Integer,
                        nl::Integer)
-    @assert d in [2,3]
+    @assert d in [1,2,3]
     # Mesh elements that will be split into domains
-    candidates = d == 2 ? m.tri2vtx : m.tet2vtx
-    candidates2boundary = d == 2 ? m.tri2edg : m.tet2tri
+    if d == 1
+        candidates = m.edg2vtx
+        candidates2boundary = m.edg2nod
+    elseif d == 2
+        candidates2boundary = m.tri2edg
+        candidates = m.tri2vtx
+    elseif d == 3
+        candidates = m.tet2vtx
+        candidates2boundary = m.tet2tri
+    end
     # To store domain elements
     domains = Vector{typeof(candidates)}(undef,0)
     domain_groups = Int64[]

@@ -67,7 +67,7 @@ export
     physical_boundary,
 
     # ddm.jl
-    InputData,
+    InputData, StandardInputData, InductiveInputData,
     indices_full_domain,
     indices_skeleton,
     indices_domain,
@@ -83,6 +83,7 @@ export
     # geometry.jl
     LayersGeo,
     get_mesh_and_domains, get_problems,
+    get_skeleton_problems,
 
     # helmholtz.jl
     HelmholtzPb,
@@ -156,6 +157,7 @@ export
     RandomTC,
 
     # transmission_condition.jl
+    transmission_boundary,
     TransmissionParameters,
     Idl2TP, Idl2TBC,
     DespresTP, DespresTBC,
