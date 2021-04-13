@@ -18,36 +18,17 @@ using Test
 using JLD
 using PGFPlots
 prefix = pwd() * "/data/"
-include("./TriLogLog.jl")
-include("./postprod.jl")
+include("./scripts/TriLogLog.jl")
+include("./scripts/postprod.jl")
 
-## General parameters
-function coef_r(x, Δc)
-    r = norm(x)
-    θ = atan(x[2], x[1])
-    ρ = (2/3) * (1 + cos(6θ) / 6)
-    if r > ρ
-        return 1
-    elseif r < ρ/5
-        return 2Δc
-    else
-        ψ = (1 + cos(6θ) / 2)
-        return 1 + Δc * ψ
-    end
-end
-function daidai(;name="eraseme")
+##
+function daidai(; k = 1, Nλ = 20, nΩ = 4, name="eraseme", op=:Id)
     d = 2
     pb_type = VectorHelmholtzPb
-    k = 5
-    Nλ = 250
     as = [1,]
-    nΩ = 25
-    ϵr = x -> coef_r(x, 3/2)
-    μr = x -> coef_r(x, 5/2)
-    medium_E = AcousticMedium(;k0=k, ρr=x->μr(x), κr=x->ϵr(x))
-    medium = AcousticMedium(;k0=k, ρr=x->μr(x), κr=x->1/ϵr(x))
+    medium = AcousticMedium(;k0=k)
     tc = ScatteringTC(;d=d, pb_type=pb_type, medium=medium, bcs=[RobinBC,])
-    tp = DtN_TP(;z=1,pb_type=pb_type,medium=dissipative_medium(medium),fbc=:robin)
+    tp = op == :Id ? DespresTP(;z=1) : DtN_TP(;z=1,pb_type=pb_type,medium=dissipative_medium(medium),fbc=:robin)
     dd = JunctionsDDM(;implicit=true, precond=true)
     # Geometry, mesh and domains
     g = LayersGeo(;d=d, shape=[:circle,:sphere,][d - 1], as=as,
@@ -55,8 +36,6 @@ function daidai(;name="eraseme")
     h = 2π / abs(k) / max(5, Nλ);
     m, Ωs, Γs = get_mesh_and_domains(g, h;);
     Ω = union(Ωs...);
-    #save_medium(m, Ω, medium_E, prefix*"xpts-matrix-medium_Maxwell")
-    #save_medium(m, Ω, medium, prefix*"xpts-matrix-medium_acoustic")
     # Solver
     solver = Jacobi_S(;tol=1.e-12, maxit=50, r=0.5, light_mode=false)
     solver = GMRES_S(;tol=1.e-12, maxit=10000, light_mode=false)
@@ -81,6 +60,10 @@ function daidai(;name="eraseme")
 end
 
 ##
-name = "eraseme"
-u, x, res, ddm = daidai(; name=name)
-ax = generate_conv_plot([name,]; dir=prefix)
+ks = 2 .^ collect(3.5:-0.5:0)
+for k in ks
+    Nλ = 20 * k^(1/2)
+    name = "pollution_2D_k$(k)";
+    u, x, res, ddm = daidai(;k=k, Nλ=Nλ, nΩ=4, name=name*"_Despres", op=:Id);
+    u, x, res, ddm = daidai(;k=k, Nλ=Nλ, nΩ=4, name=name*"_DtN",     op=:DtN);
+end

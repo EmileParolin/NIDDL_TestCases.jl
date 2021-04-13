@@ -18,24 +18,21 @@ using Test
 using JLD
 using PGFPlots
 prefix = pwd() * "/data/"
-include("./TriLogLog.jl")
-include("./postprod.jl")
+include("./scripts/TriLogLog.jl")
+include("./scripts/postprod.jl")
 
-## General parameters
-function daidai(;k = 1, Nλ0 = 20)
+##
+function daidai(; k = 1, Nλ = 20, nΩ = 4, name="eraseme", op=:Id)
     d = 2
     pb_type = VectorHelmholtzPb
-    k = 1
-    Nλ = 200
-    as = [0.5,1,]
-    nΩ = 10
+    as = [1,]
     medium = AcousticMedium(;k0=k)
-    tc = ScatteringTC(;d=d, pb_type=pb_type, medium=medium, bcs=[NeumannBC, RobinBC,])
-    tp = DtN_TP(;z=1,pb_type=pb_type,medium=dissipative_medium(medium),fbc=:robin)
+    tc = ScatteringTC(;d=d, pb_type=pb_type, medium=medium, bcs=[RobinBC,])
+    tp = op == :Id ? DespresTP(;z=1) : DtN_TP(;z=1,pb_type=pb_type,medium=dissipative_medium(medium),fbc=:robin)
     dd = JunctionsDDM(;implicit=true, precond=true)
     # Geometry, mesh and domains
     g = LayersGeo(;d=d, shape=[:circle,:sphere,][d - 1], as=as,
-                interior=false, nΩ=nΩ, mode=:metis)
+                interior=true, nΩ=nΩ, mode=:metis)
     h = 2π / abs(k) / max(5, Nλ);
     m, Ωs, Γs = get_mesh_and_domains(g, h;);
     Ω = union(Ωs...);
@@ -51,15 +48,21 @@ function daidai(;k = 1, Nλ0 = 20)
     gid = InputData(m, fullpb, pbs);
     ddm = DDM(pbs, gid, dd; to=to);
     @timeit to "Resfunc setup" resfunc = get_resfunc(m, fullpb, pbs, ddm, uexact,
-        solver; save_solutions_it=true, prefix=prefix);
+        solver; save_solutions_it=false, prefix=prefix);
     @timeit to "Solver" u, x, res = solver(ddm; resfunc=resfunc, to=to);
     # Output
-    name = "eraseme"
+    save_solutions_partition(m, fullpb, pbs, ddm, solver, u, uexact, prefix, name);
     JLD.save(prefix*name*".jld",
         "res", res, "tp", typeof(tp), "k", medium.k0, "Nlambda", Nλ, "Nomega", nΩ,
         "medium", medium.name, "nl", g.nl, "cg_min", ddm.gd.cg_min, "cg_max",
         ddm.gd.cg_max, "cg_sum", ddm.gd.cg_sum,)
     return u, x, res, ddm
 end
-ax = generate_conv_plot([name,]; dir=prefix)
-display("image/png", ax)
+
+##
+Nλs = 10 .* 2 .^ collect(1:1:6)
+for Nλ in Nλs
+    name = "stability_2D_Nl$(Nλ)";
+    u, x, res, ddm = daidai(;k=1, Nλ=Nλ, nΩ=4, name=name*"_Despres", op=:Id);
+    u, x, res, ddm = daidai(;k=1, Nλ=Nλ, nΩ=4, name=name*"_DtN",     op=:DtN);
+end
