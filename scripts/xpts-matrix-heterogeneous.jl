@@ -37,14 +37,18 @@ function coef_r(x, Δc)
 end
 
 ##
-function daidai(; k = 5, Nλ = 250, nΩ = 25, name="eraseme")
+function daidai(; k = 5, Nλ = 250, nΩ = 25, name="eraseme", heterogeneous=true)
     d = 2
     pb_type = VectorHelmholtzPb
     as = [1,]
-    ϵr = x -> coef_r(x, 3/2)
-    μr = x -> coef_r(x, 5/2)
-    medium_E = AcousticMedium(;k0=k, ρr=x->μr(x), κr=x->ϵr(x))
-    medium = AcousticMedium(;k0=k, ρr=x->μr(x), κr=x->1/ϵr(x))
+    if heterogeneous
+        ϵr = x -> coef_r(x, 3/2)
+        μr = x -> coef_r(x, 5/2)
+        #medium_E = AcousticMedium(;k0=k, ρr=x->μr(x), κr=x->ϵr(x))
+        medium = AcousticMedium(;k0=k, ρr=x->μr(x), κr=x->1/ϵr(x))
+    else
+        medium = AcousticMedium(;k0=k)
+    end
     tc = ScatteringTC(;d=d, pb_type=pb_type, medium=medium, bcs=[RobinBC,])
     tp = DtN_TP(;z=1,pb_type=pb_type,medium=dissipative_medium(medium),fbc=:robin)
     dd = JunctionsDDM(;implicit=true, precond=true)
@@ -71,19 +75,31 @@ function daidai(; k = 5, Nλ = 250, nΩ = 25, name="eraseme")
         solver; save_solutions_it=false, prefix=prefix);
     @timeit to "Solver" u, x, res = solver(ddm; resfunc=resfunc, to=to);
     # Output
-    save_solutions_partition(m, fullpb, pbs, ddm, solver, u, uexact, prefix, name);
+    #save_solutions_partition(m, fullpb, pbs, ddm, solver, u, uexact, prefix, name);
     JLD.save(prefix*name*".jld",
-        "res", res, "tp", typeof(tp), "k", medium.k0, "Nlambda", Nλ, "Nomega", nΩ,
+             "res", res, "tp", typeof(tp), "k", medium.k0, "Nlambda", Nλ, "Nomega", nΩ,
         "medium", medium.name, "nl", g.nl, "cg_min", ddm.gd.cg_min, "cg_max",
         ddm.gd.cg_max, "cg_sum", ddm.gd.cg_sum,)
     return u, x, res, ddm
 end
 
 ##
-for k in 1:4
+for k in 1:5
     Nλ = 250
     nΩ = 25
     name = "heterogeneous_2D_k$(k)_Nl$(Nλ)_n$(nΩ)";
     u, x, res, ddm = daidai(;k=k, Nλ=Nλ, nΩ=nΩ, name=name);
+    ax = generate_conv_plot([name,]; dir=prefix);
+end
+
+##
+for k in 5:-1:1
+    nΩ = 25
+    corr = 2.24 * 1.74 # Product of the means
+    corr = 5.2         # Mean of the product
+    Nλ = Int(floor(250 / sqrt(corr)))
+    k *= sqrt(corr)
+    name = replace("homogeneous_2D_k$(Int64(floor(1000*k))/1000)_Nl$(Nλ)_n$(nΩ)", "."=>"d");
+    u, x, res, ddm = daidai(;k=k, Nλ=Nλ, nΩ=nΩ, name=name, heterogeneous=false);
     ax = generate_conv_plot([name,]; dir=prefix);
 end
