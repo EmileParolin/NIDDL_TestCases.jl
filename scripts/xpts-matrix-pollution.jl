@@ -61,9 +61,32 @@ end
 
 ##
 ks = 2 .^ collect(3.5:-0.5:0)
+
+##
 for k in ks
     Nλ = 20 * k^(1/2)
     name = "pollution_2D_k$(k)";
     u, x, res, ddm = daidai(;k=k, Nλ=Nλ, nΩ=4, name=name*"_Despres", op=:Id);
     u, x, res, ddm = daidai(;k=k, Nλ=Nλ, nΩ=4, name=name*"_DtN",     op=:DtN);
 end
+
+##
+ks = 2 .^ collect(3.5:-0.5:0)
+names = ["pollution_2D_k"*replace("$(k)", "."=>"d") * endname
+        for k in ks, endname in ["_Despres", "_DtN"]]
+names = ["pollution_2D_k$(k)" * endname
+        for k in ks, endname in ["_Despres", "_DtN"]]
+##
+ax = generate_param_plot(names; dir=prefix,
+                             param_type=:k,
+                             tol=1.e-8, ertype=:HD,
+                             fullgmres=false,
+                             marks=["o", "+", "square", "asterisk", "diamond",
+                                    "triangle",],
+                             colorstyles=["black", "red", "blue", "teal", "cyan",
+                                          "orange", "magenta",],
+                             styles=["solid" for _ in 1:8],
+                             tll=[TriLogLog(0, 1.2, 0.5, 1),
+                                  #TriLogLog(0, 2, 0.5, 1, true),
+                                  ],
+                             func_on_abscissa=x->x)

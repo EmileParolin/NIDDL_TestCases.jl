@@ -18,8 +18,8 @@ using Test
 using JLD
 using PGFPlots
 prefix = pwd() * "/data/"
-include("./scripts/TriLogLog.jl")
-include("./scripts/postprod.jl")
+include("./TriLogLog.jl")
+include("./postprod.jl")
 
 ##
 function daidai(; k = 1, Nλ = 20, nΩ = 4, name="eraseme", op=:Id)
@@ -61,8 +61,26 @@ end
 
 ##
 Nλs = 10 .* 2 .^ collect(1:1:6)
+
+##
 for Nλ in Nλs
     name = "stability_2D_Nl$(Nλ)";
     u, x, res, ddm = daidai(;k=1, Nλ=Nλ, nΩ=4, name=name*"_Despres", op=:Id);
     u, x, res, ddm = daidai(;k=1, Nλ=Nλ, nΩ=4, name=name*"_DtN",     op=:DtN);
 end
+
+##
+names = ["stability_2D_Nl$(Nλ)" * endname
+        for Nλ in Nλs, endname in ["_Despres", "_DtN"]]
+##
+ax = generate_param_plot(names; dir=prefix,
+                             param_type=:Nl,
+                             tol=1.e-8, ertype=:HD,
+                             fullgmres=false,
+                             marks=["o", "+", "square", "asterisk", "diamond",
+                                    "triangle",],
+                             colorstyles=["black", "red", "blue", "teal", "cyan",
+                                          "orange", "magenta",],
+                             styles=["solid" for _ in 1:8],
+                             tll=TriLogLog[],
+                             func_on_abscissa=x->x)

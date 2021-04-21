@@ -250,7 +250,7 @@ function generate_param_plot(files;
              style="grid=both",
              xmode="log",
              ymode="log",
-             xlabel=long_param_label(param_type),
+             xlabel="",
              ylabel=L"Iteration count$~$",
              #legendPos="outer north east",
              legendPos="north west",

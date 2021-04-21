@@ -37,7 +37,7 @@ function coef_r(x, Δc)
 end
 
 ##
-function daidai(; k = 5, Nλ = 250, nΩ = 25, name="eraseme")
+function daidai(; k = 5, Nλ = 250, nΩ = 25, name="eraseme", heterogeneous=true)
     d = 2
     pb_type = VectorHelmholtzPb
     as = [1,]
@@ -80,10 +80,29 @@ function daidai(; k = 5, Nλ = 250, nΩ = 25, name="eraseme")
 end
 
 ##
-for k in 1:4
+for k in 1:5
     Nλ = 250
     nΩ = 25
     name = "heterogeneous_2D_k$(k)_Nl$(Nλ)_n$(nΩ)";
     u, x, res, ddm = daidai(;k=k, Nλ=Nλ, nΩ=nΩ, name=name);
     ax = generate_conv_plot([name,]; dir=prefix);
+end
+
+##
+names_heterogeneous = ["heterogeneous_2D_k1_Nl250_n25",
+                       "heterogeneous_2D_k2_Nl250_n25",
+                       "heterogeneous_2D_k3_Nl250_n25",
+                       "heterogeneous_2D_k4_Nl250_n25",
+                       "heterogeneous_2D_k5_Nl250_n25",]
+names_homogeneous   = ["homogeneous_2D_k2d28_Nl109_n25",
+                       "homogeneous_2D_k4d56_Nl109_n25",
+                       "homogeneous_2D_k6d841_Nl109_n25",
+                       "homogeneous_2D_k9d121_Nl109_n25",
+                       "homogeneous_2D_k11d401_Nl109_n25",]
+for (k, hom, het) in zip(collect(1:5), names_homogeneous, names_heterogeneous)
+    ax = generate_conv_plot([het, hom]; dir=prefix);
+    ax.plots[1].legendentry = "Heterogeneous"
+    ax.plots[2].legendentry = "Homogeneous"
+    ax.ymin = 5e-9
+    PGFPlots.save(prefix*"heterogeneous_2D_k$(k)_cvplot.pdf", ax)
 end
