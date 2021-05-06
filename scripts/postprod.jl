@@ -201,7 +201,11 @@ function generate_table(data, param_type; tol=1.e-10, ertype=:HD, dir="./")
     its = Array{Int64,2}(undef, Nrows, Ncols)
     for i in 1:Nrows
         for j in 1:Ncols
-            its[i,j] = tolerance_reached_at(ress[i,j], tol; ertype=ertype)
+            if ertype == :cg_max
+                its[i,j] = ress[i,j].cg_max
+            else
+                its[i,j] = tolerance_reached_at(ress[i,j], tol; ertype=ertype)
+            end
         end
     end
     return ress, rlabs, clabs, its

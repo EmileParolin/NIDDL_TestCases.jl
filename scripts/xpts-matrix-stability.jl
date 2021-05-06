@@ -72,7 +72,8 @@ end
 ##
 names = ["stability_2D_Nl$(Nλ)" * endname
         for Nλ in Nλs, endname in ["_Despres", "_DtN"]]
-##
+# Removing last result because issue
+names = names[1:end-1,:]
 ax = generate_param_plot(names; dir=prefix,
                              param_type=:Nl,
                              tol=1.e-8, ertype=:HD,
@@ -82,5 +83,35 @@ ax = generate_param_plot(names; dir=prefix,
                              colorstyles=["black", "red", "blue", "teal", "cyan",
                                           "orange", "magenta",],
                              styles=["solid" for _ in 1:8],
+                             tll=[TriLogLog(1.5, 1.7, 0.75, 1),],
+                             func_on_abscissa=x->x)
+ax.plots[1].legendentry = "Despr\\'es"
+ax.plots[2].legendentry = "Schur"
+ax.xmin = 10^1
+ax.xmax = 10^3
+ax.xlabel = "Mesh refinement \$\\lambda/h\$"
+PGFPlots.save(prefix*"xpts-matrix-stability_2D.pdf", ax)
+ax
+
+##
+names = ["stability_2D_Nl$(Nλ)" * endname
+        for Nλ in Nλs, endname in ["_Despres", "_DtN"]]
+ax = generate_param_plot(names; dir=prefix,
+                             param_type=:Nl,
+                             tol=1.e-8, ertype=:cg_max,
+                             fullgmres=false,
+                             marks=["o", "+", "square", "asterisk", "diamond",
+                                    "triangle",],
+                             colorstyles=["black", "red", "blue", "teal", "cyan",
+                                          "orange", "magenta",],
+                             styles=["solid" for _ in 1:8],
                              tll=TriLogLog[],
                              func_on_abscissa=x->x)
+ax.plots[1].legendentry = "Despr\\'es"
+ax.plots[2].legendentry = "Schur"
+ax.xmin = 10^1
+ax.xmax = 10^3
+ax.xlabel = "Mesh refinement \$\\lambda/h\$"
+ax.ylabel = "Maximum number of inner  CG iterations"
+PGFPlots.save(prefix*"xpts-matrix-stability-cgmax_2D.pdf", ax)
+ax

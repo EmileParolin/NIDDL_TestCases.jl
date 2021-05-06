@@ -120,5 +120,5 @@ for (k, hom, het) in zip(collect(1:5), names_homogeneous, names_heterogeneous)
     ax.plots[1].legendentry = "Heterogeneous"
     ax.plots[2].legendentry = "Homogeneous"
     ax.ymin = 5e-9
-    PGFPlots.save(prefix*"heterogeneous_2D_k$(k)_cvplot.pdf", ax)
+    PGFPlots.save(prefix*"xpts-matrix-heterogeneous_2D_k$(k)_cvplot.pdf", ax)
 end

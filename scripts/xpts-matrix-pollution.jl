@@ -75,7 +75,6 @@ names = ["pollution_2D_k"*replace("$(k)", "."=>"d") * endname
         for k in ks, endname in ["_Despres", "_DtN"]]
 names = ["pollution_2D_k$(k)" * endname
         for k in ks, endname in ["_Despres", "_DtN"]]
-##
 ax = generate_param_plot(names; dir=prefix,
                              param_type=:k,
                              tol=1.e-8, ertype=:HD,
@@ -89,6 +88,11 @@ ax = generate_param_plot(names; dir=prefix,
                                   #TriLogLog(0, 2, 0.5, 1, true),
                                   ],
                              func_on_abscissa=x->x)
+ax.plots[1].legendentry = "Despr\\'es"
+ax.plots[2].legendentry = "Schur"
+ax.xlabel = "Wavenumber \$\\kappa\$"
+PGFPlots.save(prefix*"xpts-matrix-pollution_2D.pdf", ax)
+ax
 
 ##
 for k in ks

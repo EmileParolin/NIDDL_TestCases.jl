@@ -72,3 +72,26 @@ for J in Js
     u, x, res, ddm = daidai(;d=d, k=k, Nλ=Nλ, nΩ=J, aR=aR, name=name*"_Despres", op=:Id);
     u, x, res, ddm = daidai(;d=d, k=k, Nλ=Nλ, nΩ=J, aR=aR, name=name*"_DtN",     op=:DtN);
 end
+
+##
+d = 2; k = 1; Nλ = 40
+Js = 2 .^ collect(8:-1:1)
+aRs = Int64.(floor.(1000 .* ( 1. .* Js .^ (1/d) ))) ./ 1000
+names = [replace("weak_scaling_$(d)D_k$(k)_Nl$(Nλ)_J$(J)_a$(aR)", "."=>"d") * endname
+        for (J, aR) in zip(Js, aRs), endname in ["_Despres", "_DtN"]]
+ax = generate_param_plot(names; dir=prefix,
+                             param_type=:n,
+                             tol=1.e-8, ertype=:HD,
+                             fullgmres=false,
+                             marks=["o", "+", "square", "asterisk", "diamond",
+                                    "triangle",],
+                             colorstyles=["black", "red", "blue", "teal", "cyan",
+                                          "orange", "magenta",],
+                             styles=["solid" for _ in 1:8],
+                             tll=[TriLogLog(1,1.5,0.5,2),],
+                             func_on_abscissa=x->x)
+ax.plots[1].legendentry = "Despr\\'es"
+ax.plots[2].legendentry = "Schur"
+ax.xlabel = "Number of subdomains \$J\$"
+PGFPlots.save(prefix*"xpts-matrix-weak-scaling_2D.pdf", ax)
+ax
