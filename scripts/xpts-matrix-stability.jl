@@ -1,8 +1,8 @@
 using Revise
 using Pkg
 Pkg.activate("./")
-Pkg.update("NIDDL_FEM")
-Pkg.update("NIDDL")
+#Pkg.update("NIDDL_FEM")
+#Pkg.update("NIDDL")
 using LinearAlgebra
 using SparseArrays
 using SuiteSparse
@@ -14,19 +14,18 @@ using TimerOutputs
 using NIDDL_FEM
 using NIDDL
 using NIDDL_TestCases
-using Test
+#using Test
 using JLD
-using PGFPlots
+#using PGFPlots
 prefix = pwd() * "/data/"
-include("./TriLogLog.jl")
-include("./postprod.jl")
+#include("./TriLogLog.jl")
+#include("./postprod.jl")
 
 ##
-function daidai(; k = 1, Nλ = 20, nΩ = 4, name="eraseme", op=:Id)
-    d = 2
-    pb_type = VectorHelmholtzPb
-    as = [1,]
-    medium = AcousticMedium(;k0=k)
+function daidai(; d=2, k=1, Nλ=20, nΩ=4, a=1, name="eraseme", op=:Id)
+    pb_type = d == 2 ? VectorHelmholtzPb : MaxwellPb
+    as = [a,]
+    medium = d == 2 ? AcousticMedium(;k0=k) : ElectromagneticMedium(;k0=k)
     tc = ScatteringTC(;d=d, pb_type=pb_type, medium=medium, bcs=[RobinBC,])
     tp = op == :Id ? DespresTP(;z=1) : DtN_TP(;z=1,pb_type=pb_type,medium=dissipative_medium(medium),fbc=:robin)
     dd = JunctionsDDM(;implicit=true, precond=true)
@@ -61,8 +60,6 @@ end
 
 ##
 Nλs = 10 .* 2 .^ collect(1:1:6)
-
-##
 for Nλ in Nλs
     name = "stability_2D_Nl$(Nλ)";
     u, x, res, ddm = daidai(;k=1, Nλ=Nλ, nΩ=4, name=name*"_Despres", op=:Id);
@@ -107,6 +104,7 @@ ax = generate_param_plot(names; dir=prefix,
                              styles=["solid" for _ in 1:8],
                              tll=TriLogLog[],
                              func_on_abscissa=x->x)
+<<<<<<< HEAD
 ax.plots[1].legendentry = "Despr\\'es"
 ax.plots[2].legendentry = "Schur"
 ax.xmin = 10^1
@@ -115,3 +113,13 @@ ax.xlabel = "Mesh refinement \$\\lambda/h\$"
 ax.ylabel = "Maximum number of inner  CG iterations"
 PGFPlots.save(prefix*"xpts-matrix-stability-cgmax_2D.pdf", ax)
 ax
+=======
+
+##
+Nλs = 10 .* 2 .^ collect(4.5:-0.5:1)
+for Nλ in Nλs
+    name = "stability_3D_Nl$(Nλ)";
+    u, x, res, ddm = daidai(;d=3, k=1, Nλ=Nλ, nΩ=32, a=0.5, name=name*"_Despres", op=:Id);
+    u, x, res, ddm = daidai(;d=3, k=1, Nλ=Nλ, nΩ=32, a=0.5, name=name*"_DtN",     op=:DtN);
+end
+>>>>>>> 786a69cd9eeea033ea3236975b111e47e05083a4

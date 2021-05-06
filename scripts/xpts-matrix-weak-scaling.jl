@@ -59,8 +59,8 @@ function daidai(; d = 2, k = 1, Nλ = 20, nΩ = 4, aR = 1, name="eraseme", op=:I
 end
 
 ##
-d = 2; k = 2; Nλ = 20
-Js = 2 .^ collect(10:-1:0)
+d = 2; k = 1; Nλ = 40
+Js = 2 .^ collect(8:-1:0)
 for J in Js
     aR = Int64(floor(1000*( 1. * J^(1/d) )))/1000
     area = π * aR^d
@@ -95,3 +95,16 @@ ax.plots[2].legendentry = "Schur"
 ax.xlabel = "Number of subdomains \$J\$"
 PGFPlots.save(prefix*"xpts-matrix-weak-scaling_2D.pdf", ax)
 ax
+d = 3; k = 1; Nλ = 20
+Js = 2 .^ collect(7:-1:1)
+for J in Js
+    aR = Int64(floor(1000*( 1 .* J^(1/d) / 2^(1/3))))/1000
+    area = π * aR^d
+    areaj = area / J
+    h = 2π/k / Nλ
+    ndofj = areaj / h^d
+    @info "J = $(J) \t| R = $(aR) \t| h = $(h) \t| Ndofj = $(ndofj)"
+    name = replace("weak_scaling_$(d)D_k$(k)_Nl$(Nλ)_J$(J)_a$(aR)", "."=>"d");
+    u, x, res, ddm = daidai(;d=d, k=k, Nλ=Nλ, nΩ=J, aR=aR, name=name*"_Despres", op=:Id);
+    u, x, res, ddm = daidai(;d=d, k=k, Nλ=Nλ, nΩ=J, aR=aR, name=name*"_DtN",     op=:DtN);
+end

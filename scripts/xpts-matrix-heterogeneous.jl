@@ -1,8 +1,8 @@
-using Revise
+#using Revise
 using Pkg
 Pkg.activate("./")
-Pkg.update("NIDDL_FEM")
-Pkg.update("NIDDL")
+#Pkg.update("NIDDL_FEM")
+#Pkg.update("NIDDL")
 using LinearAlgebra
 using SparseArrays
 using SuiteSparse
@@ -14,17 +14,17 @@ using TimerOutputs
 using NIDDL_FEM
 using NIDDL
 using NIDDL_TestCases
-using Test
+#using Test
 using JLD
-using PGFPlots
+#using PGFPlots
 prefix = pwd() * "/data/"
-include("./scripts/TriLogLog.jl")
-include("./scripts/postprod.jl")
+#include("./scripts/TriLogLog.jl")
+#include("./scripts/postprod.jl")
 
 ## General parameters
-function coef_r(x, Δc)
+function coef_r(x, Δc; d=2)
     r = norm(x)
-    θ = atan(x[2], x[1])
+    θ = d==2 ? atan(x[2], x[1]) : atan(norm(x[1:2]), x[3])
     ρ = (2/3) * (1 + cos(6θ) / 6)
     if r > ρ
         return 1
@@ -37,17 +37,16 @@ function coef_r(x, Δc)
 end
 
 ##
-function daidai(; k = 5, Nλ = 250, nΩ = 25, name="eraseme", heterogeneous=true)
-    d = 2
-    pb_type = VectorHelmholtzPb
-    as = [1,]
+function daidai(; d = 2, k = 5, Nλ = 250, nΩ = 25, a = 1, name="eraseme", heterogeneous=true, light_mode=false)
+    pb_type = d == 2 ? VectorHelmholtzPb : MaxwellPb
+    as = [a,]
     if heterogeneous
         ϵr = x -> coef_r(x, 3/2)
         μr = x -> coef_r(x, 5/2)
         #medium_E = AcousticMedium(;k0=k, ρr=x->μr(x), κr=x->ϵr(x))
-        medium = AcousticMedium(;k0=k, ρr=x->μr(x), κr=x->1/ϵr(x))
+        medium = d == 2 ? AcousticMedium(;k0=k, ρr=x->μr(x), κr=x->1/ϵr(x)) : ElectromagneticMedium(;k0=k, μr=x->μr(x), ϵr=x->ϵr(x))
     else
-        medium = AcousticMedium(;k0=k)
+        medium = d == 2 ? AcousticMedium(;k0=k) : ElectromagneticMedium(;k0=k)
     end
     tc = ScatteringTC(;d=d, pb_type=pb_type, medium=medium, bcs=[RobinBC,])
     tp = DtN_TP(;z=1,pb_type=pb_type,medium=dissipative_medium(medium),fbc=:robin)
@@ -61,8 +60,7 @@ function daidai(; k = 5, Nλ = 250, nΩ = 25, name="eraseme", heterogeneous=true
     #save_medium(m, Ω, medium_E, prefix*"xpts-matrix-medium_Maxwell")
     #save_medium(m, Ω, medium, prefix*"xpts-matrix-medium_acoustic")
     # Solver
-    solver = Jacobi_S(;tol=1.e-12, maxit=50, r=0.5, light_mode=false)
-    solver = GMRES_S(;tol=1.e-12, maxit=10000, light_mode=false)
+    solver = GMRES_S(;tol=1.e-12, maxit=10000, light_mode=light_mode)
     # Problems
     fullpb, pbs = get_problems(g, tc, Ωs, Γs, tp, dd);
     # Exact discrete solution
@@ -85,16 +83,13 @@ end
 
 ##
 for k in 1:5
-    Nλ = 250
     nΩ = 25
+    # Heterogeneous
+    Nλ = 250
     name = "heterogeneous_2D_k$(k)_Nl$(Nλ)_n$(nΩ)";
     u, x, res, ddm = daidai(;k=k, Nλ=Nλ, nΩ=nΩ, name=name);
     ax = generate_conv_plot([name,]; dir=prefix);
-end
-
-##
-for k in 5:-1:1
-    nΩ = 25
+    # Homogeneous
     corr = 2.24 * 1.74 # Product of the means
     corr = 5.2         # Mean of the product
     Nλ = Int(floor(250 / sqrt(corr)))
@@ -121,4 +116,22 @@ for (k, hom, het) in zip(collect(1:5), names_homogeneous, names_heterogeneous)
     ax.plots[2].legendentry = "Homogeneous"
     ax.ymin = 5e-9
     PGFPlots.save(prefix*"xpts-matrix-heterogeneous_2D_k$(k)_cvplot.pdf", ax)
+end
+
+##
+for k in 1:1
+    nΩ = 50
+    # Heterogeneous
+    Nλ = 150
+    name = "heterogeneous_3D_k$(Int64(floor(1000*k))/1000)_Nl$(Nλ)_n$(nΩ)";
+    u, x, res, ddm = daidai(;d=3, k=k, Nλ=Nλ, nΩ=nΩ, name=name);
+    #ax = generate_conv_plot([name,]; dir=prefix);
+    # Homogeneous
+    corr = 2.24 * 1.74 # Product of the means
+    corr = 5.2         # Mean of the product
+    Nλ = Int(floor(Nλ / sqrt(corr)))
+    k *= sqrt(corr)
+    name = replace("homogeneous_3D_k$(Int64(floor(1000*k))/1000)_Nl$(Nλ)_n$(nΩ)", "."=>"d");
+    u, x, res, ddm = daidai(;d=3, k=k, Nλ=Nλ, nΩ=nΩ, name=name, heterogeneous=false);
+    #ax = generate_conv_plot([name,]; dir=prefix);
 end
