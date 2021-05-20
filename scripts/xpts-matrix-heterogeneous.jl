@@ -37,14 +37,21 @@ function coef_r(x, Δc; d=2)
 end
 
 ##
-function daidai(; d = 2, k = 5, Nλ = 250, nΩ = 25, a = 1, name="eraseme", heterogeneous=true, light_mode=false)
+function daidai(; d = 2, k = 5, Nλ = 250, nΩ = 25, a = 1, name="eraseme", heterogeneous=true, elliptic=false, light_mode=false)
     pb_type = d == 2 ? VectorHelmholtzPb : MaxwellPb
     as = [a,]
     if heterogeneous
-        ϵr = x -> coef_r(x, 3/2)
-        μr = x -> coef_r(x, 5/2)
-        #medium_E = AcousticMedium(;k0=k, ρr=x->μr(x), κr=x->ϵr(x))
-        medium = d == 2 ? AcousticMedium(;k0=k, ρr=x->μr(x), κr=x->1/ϵr(x)) : ElectromagneticMedium(;k0=k, μr=x->μr(x), ϵr=x->ϵr(x))
+        if elliptic
+            ϵr = x -> coef_r(x, 3/2) + im * coef_r(x, 3/2) / 6
+            μr = x -> coef_r(x, 5/2) + im * coef_r(x, 5/2) / 4
+            #medium_E = AcousticMedium(;k0=k, ρr=x->μr(x), κr=x->ϵr(x))
+            medium = d == 2 ? AcousticMedium(;k0=k, ρr=x->μr(x), κr=x->1/ϵr(x)) : ElectromagneticMedium(;k0=k, μr=x->μr(x), ϵr=x->ϵr(x))
+        else
+            ϵr = x -> coef_r(x, 3/2)
+            μr = x -> coef_r(x, 5/2)
+            #medium_E = AcousticMedium(;k0=k, ρr=x->μr(x), κr=x->ϵr(x))
+            medium = d == 2 ? AcousticMedium(;k0=k, ρr=x->μr(x), κr=x->1/ϵr(x)) : ElectromagneticMedium(;k0=k, μr=x->μr(x), ϵr=x->ϵr(x))
+        end
     else
         medium = d == 2 ? AcousticMedium(;k0=k) : ElectromagneticMedium(;k0=k)
     end
@@ -84,18 +91,23 @@ end
 ##
 for k in 1:5
     nΩ = 25
-    # Heterogeneous
+    ## Heterogeneous
+    #Nλ = 250
+    #name = "heterogeneous_2D_k$(k)_Nl$(Nλ)_n$(nΩ)";
+    #u, x, res, ddm = daidai(;k=k, Nλ=Nλ, nΩ=nΩ, name=name);
+    #ax = generate_conv_plot([name,]; dir=prefix);
+    ## Homogeneous
+    #corr = 2.24 * 1.74 # Product of the means
+    #corr = 5.2         # Mean of the product
+    #Nλ = Int(floor(250 / sqrt(corr)))
+    #k *= sqrt(corr)
+    #name = replace("homogeneous_2D_k$(Int64(floor(1000*k))/1000)_Nl$(Nλ)_n$(nΩ)", "."=>"d");
+    #u, x, res, ddm = daidai(;k=k, Nλ=Nλ, nΩ=nΩ, name=name, heterogeneous=false);
+    #ax = generate_conv_plot([name,]; dir=prefix);
+    # Elliptic
     Nλ = 250
-    name = "heterogeneous_2D_k$(k)_Nl$(Nλ)_n$(nΩ)";
-    u, x, res, ddm = daidai(;k=k, Nλ=Nλ, nΩ=nΩ, name=name);
-    ax = generate_conv_plot([name,]; dir=prefix);
-    # Homogeneous
-    corr = 2.24 * 1.74 # Product of the means
-    corr = 5.2         # Mean of the product
-    Nλ = Int(floor(250 / sqrt(corr)))
-    k *= sqrt(corr)
-    name = replace("homogeneous_2D_k$(Int64(floor(1000*k))/1000)_Nl$(Nλ)_n$(nΩ)", "."=>"d");
-    u, x, res, ddm = daidai(;k=k, Nλ=Nλ, nΩ=nΩ, name=name, heterogeneous=false);
+    name = replace("elliptic_2D_k$(k)_Nl$(Nλ)_n$(nΩ)", "."=>"d");
+    u, x, res, ddm = daidai(;k=k, Nλ=Nλ, nΩ=nΩ, name=name, elliptic=true);
     ax = generate_conv_plot([name,]; dir=prefix);
 end
 
@@ -110,10 +122,16 @@ names_homogeneous   = ["homogeneous_2D_k2d28_Nl109_n25",
                        "homogeneous_2D_k6d841_Nl109_n25",
                        "homogeneous_2D_k9d121_Nl109_n25",
                        "homogeneous_2D_k11d401_Nl109_n25",]
-for (k, hom, het) in zip(collect(1:5), names_homogeneous, names_heterogeneous)
-    ax = generate_conv_plot([het, hom]; dir=prefix);
+names_elliptic   = ["elliptic_2D_k1_Nl250_n25",
+                    "elliptic_2D_k2_Nl250_n25",
+                    "elliptic_2D_k3_Nl250_n25",
+                    "elliptic_2D_k4_Nl250_n25",
+                    "elliptic_2D_k5_Nl250_n25",]
+for (k, hom, het, ell) in zip(collect(1:5), names_homogeneous, names_heterogeneous, names_elliptic)
+    ax = generate_conv_plot([het, hom, ell]; dir=prefix);
     ax.plots[1].legendentry = "Heterogeneous"
     ax.plots[2].legendentry = "Homogeneous"
+    ax.plots[3].legendentry = "Dissipative"
     ax.ymin = 5e-9
     PGFPlots.save(prefix*"xpts-matrix-heterogeneous_2D_k$(k)_cvplot.pdf", ax)
 end

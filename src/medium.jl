@@ -21,7 +21,7 @@ Produce a dissipative medium from a non-dissipative one.
 
 No checks are performed. Compatible with a time-dependance in e^{-iωt}.
 """
-dissipative_medium(m::AcousticMedium) = AcousticMedium(;k0=m.k0, ρr=x->im*m.ρr(x), κr=x->-im*m.κr(x))
+dissipative_medium(m::AcousticMedium; func=real) = AcousticMedium(;k0=m.k0, ρr=x->im*real(m.ρr(x)), κr=x->-im*real(m.κr(x)))
 
 """
     c = √(κ / ρ)
@@ -82,7 +82,7 @@ Produce a dissipative medium from a non-dissipative one.
 
 No checks are performed. Compatible with a time-dependance in e^{-iωt}.
 """
-dissipative_medium(m::ElectromagneticMedium) = ElectromagneticMedium(;k0=m.k0, μr=x->im*m.μr(x), ϵr=x->im*m.ϵr(x))
+dissipative_medium(m::ElectromagneticMedium; func=real) = ElectromagneticMedium(;k0=m.k0, μr=x->im*func(m.μr(x)), ϵr=x->im*func(m.ϵr(x)))
 
 """
     c = 1 / √(ϵμ)
