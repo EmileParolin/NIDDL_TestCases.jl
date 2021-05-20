@@ -22,17 +22,17 @@ include("./TriLogLog.jl")
 include("./postprod.jl")
 
 ## General parameters
-function coef_r(x, Δc; d=2)
+function coef_r(x, Δc; d=2, diss=0)
     r = norm(x)
     θ = d==2 ? atan(x[2], x[1]) : atan(norm(x[1:2]), x[3])
     ρ = (2/3) * (1 + cos(6θ) / 6)
     if r > ρ
         return 1
     elseif r < ρ/5
-        return 2Δc
+        return 2Δc * (1 + diss * im)
     else
         ψ = (1 + cos(6θ) / 2)
-        return 1 + Δc * ψ
+        return (1 + Δc * ψ) * (1 + diss * im)
     end
 end
 
@@ -42,8 +42,8 @@ function daidai(; d = 2, k = 5, Nλ = 250, nΩ = 25, a = 1, name="eraseme", hete
     as = [a,]
     if heterogeneous
         if elliptic
-            ϵr = x -> coef_r(x, 3/2) + im * coef_r(x, 3/2) / 6
-            μr = x -> coef_r(x, 5/2) + im * coef_r(x, 5/2) / 4
+            ϵr = x -> coef_r(x, 3/2; diss=1/6)
+            μr = x -> coef_r(x, 5/2; diss=1/4)
             #medium_E = AcousticMedium(;k0=k, ρr=x->μr(x), κr=x->ϵr(x))
             medium = d == 2 ? AcousticMedium(;k0=k, ρr=x->μr(x), κr=x->1/ϵr(x)) : ElectromagneticMedium(;k0=k, μr=x->μr(x), ϵr=x->ϵr(x))
         else
@@ -91,24 +91,23 @@ end
 ##
 for k in 1:5
     nΩ = 25
-    ## Heterogeneous
-    #Nλ = 250
-    #name = "heterogeneous_2D_k$(k)_Nl$(Nλ)_n$(nΩ)";
-    #u, x, res, ddm = daidai(;k=k, Nλ=Nλ, nΩ=nΩ, name=name);
-    #ax = generate_conv_plot([name,]; dir=prefix);
-    ## Homogeneous
-    #corr = 2.24 * 1.74 # Product of the means
-    #corr = 5.2         # Mean of the product
-    #Nλ = Int(floor(250 / sqrt(corr)))
-    #k *= sqrt(corr)
-    #name = replace("homogeneous_2D_k$(Int64(floor(1000*k))/1000)_Nl$(Nλ)_n$(nΩ)", "."=>"d");
-    #u, x, res, ddm = daidai(;k=k, Nλ=Nλ, nΩ=nΩ, name=name, heterogeneous=false);
+    Nλ = 250
+    # Heterogeneous
+    name = "heterogeneous_2D_k$(k)_Nl$(Nλ)_n$(nΩ)";
+    u, x, res, ddm = daidai(;k=k, Nλ=Nλ, nΩ=nΩ, name=name);
     #ax = generate_conv_plot([name,]; dir=prefix);
     # Elliptic
-    Nλ = 250
     name = replace("elliptic_2D_k$(k)_Nl$(Nλ)_n$(nΩ)", "."=>"d");
     u, x, res, ddm = daidai(;k=k, Nλ=Nλ, nΩ=nΩ, name=name, elliptic=true);
-    ax = generate_conv_plot([name,]; dir=prefix);
+    #ax = generate_conv_plot([name,]; dir=prefix);
+    # Homogeneous
+    corr = 2.24 * 1.74 # Product of the means
+    corr = 5.2         # Mean of the product
+    Nλ = Int(floor(250 / sqrt(corr)))
+    k *= sqrt(corr)
+    name = replace("homogeneous_2D_k$(Int64(floor(1000*k))/1000)_Nl$(Nλ)_n$(nΩ)", "."=>"d");
+    u, x, res, ddm = daidai(;k=k, Nλ=Nλ, nΩ=nΩ, name=name, heterogeneous=false);
+    #ax = generate_conv_plot([name,]; dir=prefix);
 end
 
 ##
@@ -139,10 +138,14 @@ end
 ##
 for k in 1:1
     nΩ = 50
-    # Heterogeneous
     Nλ = 150
+    # Heterogeneous
     name = "heterogeneous_3D_k$(Int64(floor(1000*k))/1000)_Nl$(Nλ)_n$(nΩ)";
     u, x, res, ddm = daidai(;d=3, k=k, Nλ=Nλ, nΩ=nΩ, name=name);
+    #ax = generate_conv_plot([name,]; dir=prefix);
+    # Elliptic
+    name = replace("elliptic_3D_k$(Int64(floor(1000*k))/1000)_Nl$(Nλ)_n$(nΩ)", "."=>"d");
+    u, x, res, ddm = daidai(;d=3, k=k, Nλ=Nλ, nΩ=nΩ, name=name, elliptic=true);
     #ax = generate_conv_plot([name,]; dir=prefix);
     # Homogeneous
     corr = 2.24 * 1.74 # Product of the means
