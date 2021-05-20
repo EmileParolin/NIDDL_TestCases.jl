@@ -104,7 +104,6 @@ ax = generate_param_plot(names; dir=prefix,
                              styles=["solid" for _ in 1:8],
                              tll=TriLogLog[],
                              func_on_abscissa=x->x)
-<<<<<<< HEAD
 ax.plots[1].legendentry = "Despr\\'es"
 ax.plots[2].legendentry = "Schur"
 ax.xmin = 10^1
@@ -113,7 +112,6 @@ ax.xlabel = "Mesh refinement \$\\lambda/h\$"
 ax.ylabel = "Maximum number of inner  CG iterations"
 PGFPlots.save(prefix*"xpts-matrix-stability-cgmax_2D.pdf", ax)
 ax
-=======
 
 ##
 Nλs = 10 .* 2 .^ collect(4.5:-0.5:1)
@@ -122,4 +120,26 @@ for Nλ in Nλs
     u, x, res, ddm = daidai(;d=3, k=1, Nλ=Nλ, nΩ=32, a=0.5, name=name*"_Despres", op=:Id);
     u, x, res, ddm = daidai(;d=3, k=1, Nλ=Nλ, nΩ=32, a=0.5, name=name*"_DtN",     op=:DtN);
 end
->>>>>>> 786a69cd9eeea033ea3236975b111e47e05083a4
+
+##
+Nλs = 10 .* 2 .^ collect(4.5:-0.5:2.5)
+names = ["stability_3D_Nl$(Nλ)" * endname
+        for Nλ in Nλs, endname in ["_Despres", "_DtN"]]
+ax = generate_param_plot(names; dir=prefix,
+                             param_type=:Nl,
+                             tol=1.e-8, ertype=:HD,
+                             fullgmres=false,
+                             marks=["o", "+", "square", "asterisk", "diamond",
+                                    "triangle",],
+                             colorstyles=["black", "red", "blue", "teal", "cyan",
+                                          "orange", "magenta",],
+                             styles=["solid" for _ in 1:8],
+                             tll=[TriLogLog(1.5, 2.1, 0.75, 1),],
+                             func_on_abscissa=x->x)
+ax.plots[1].legendentry = "Despr\\'es"
+ax.plots[2].legendentry = "Schur"
+ax.xmin = 10^1
+ax.xmax = 10^3
+ax.xlabel = "Mesh refinement \$\\lambda/h\$"
+PGFPlots.save(prefix*"xpts-matrix-stability_3D.pdf", ax)
+ax

@@ -16,10 +16,10 @@ using NIDDL
 using NIDDL_TestCases
 #using Test
 using JLD
-#using PGFPlots
+using PGFPlots
 prefix = pwd() * "/data/"
-#include("./scripts/TriLogLog.jl")
-#include("./scripts/postprod.jl")
+include("./TriLogLog.jl")
+include("./postprod.jl")
 
 ## General parameters
 function coef_r(x, Δc; d=2)
@@ -134,4 +134,15 @@ for k in 1:1
     name = replace("homogeneous_3D_k$(Int64(floor(1000*k))/1000)_Nl$(Nλ)_n$(nΩ)", "."=>"d");
     u, x, res, ddm = daidai(;d=3, k=k, Nλ=Nλ, nΩ=nΩ, name=name, heterogeneous=false);
     #ax = generate_conv_plot([name,]; dir=prefix);
+end
+
+##
+names_heterogeneous = ["heterogeneous_3D_k1.0_Nl150_n50",]
+names_homogeneous   = ["homogeneous_3D_k2d28_Nl65_n50",]
+for (k, hom, het) in zip(collect(1:1), names_homogeneous, names_heterogeneous)
+    ax = generate_conv_plot([het, hom]; dir=prefix);
+    ax.plots[1].legendentry = "Heterogeneous"
+    ax.plots[2].legendentry = "Homogeneous"
+    ax.ymin = 5e-9
+    PGFPlots.save(prefix*"xpts-matrix-heterogeneous_3D_k$(k)_cvplot.pdf", ax)
 end

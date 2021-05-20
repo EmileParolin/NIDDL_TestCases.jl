@@ -95,6 +95,8 @@ ax.plots[2].legendentry = "Schur"
 ax.xlabel = "Number of subdomains \$J\$"
 PGFPlots.save(prefix*"xpts-matrix-weak-scaling_2D.pdf", ax)
 ax
+
+##
 d = 3; k = 1; Nλ = 20
 Js = 2 .^ collect(7:-1:1)
 for J in Js
@@ -108,3 +110,28 @@ for J in Js
     u, x, res, ddm = daidai(;d=d, k=k, Nλ=Nλ, nΩ=J, aR=aR, name=name*"_Despres", op=:Id);
     u, x, res, ddm = daidai(;d=d, k=k, Nλ=Nλ, nΩ=J, aR=aR, name=name*"_DtN",     op=:DtN);
 end
+
+##
+d = 3; k = 1; Nλ = 20
+Js = 2 .^ collect(7:-1:1)
+aRs = Int64.(floor.(1000 .* ( 1. .* Js .^ (1/d) / 2^(1/3)))) ./ 1000
+names = [replace("weak_scaling_$(d)D_k$(k)_Nl$(Nλ)_J$(J)_a$(aR)", "."=>"d") * endname
+        for (J, aR) in zip(Js, aRs), endname in ["_Despres", "_DtN"]]
+ax = generate_param_plot(names; dir=prefix,
+                             param_type=:n,
+                             tol=1.e-8, ertype=:HD,
+                             fullgmres=false,
+                             marks=["o", "+", "square", "asterisk", "diamond",
+                                    "triangle",],
+                             colorstyles=["black", "red", "blue", "teal", "cyan",
+                                          "orange", "magenta",],
+                             styles=["solid" for _ in 1:8],
+                             tll=[TriLogLog(1,1.35,0.33,1),
+                                  TriLogLog(1,2.15,0.33,1),
+                             ],
+                             func_on_abscissa=x->x)
+ax.plots[1].legendentry = "Despr\\'es"
+ax.plots[2].legendentry = "Schur"
+ax.xlabel = "Number of subdomains \$J\$"
+PGFPlots.save(prefix*"xpts-matrix-weak-scaling_3D.pdf", ax)
+ax
